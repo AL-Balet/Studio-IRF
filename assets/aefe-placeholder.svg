@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 180" role="img" aria-label="Logo AEFE provisoire">
+  <rect width="320" height="180" rx="18" fill="#ffffff"/>
+  <rect x="18" y="18" width="284" height="144" rx="12" fill="#f4f7fa" stroke="#d7e1e8" stroke-width="4"/>
+  <text x="160" y="92" text-anchor="middle" font-family="Arial, sans-serif" font-size="48" font-weight="800" fill="#1f3b63">AEFE</text>
+  <text x="160" y="124" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="700" fill="#607083">logo provisoire</text>
+</svg>

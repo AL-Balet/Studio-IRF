@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Studio IRF</title>
+    <link rel="stylesheet" href="styles.css?v=20261007-82" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="workspace" aria-label="Apercu du montage">
+        <div class="brand-strip">
+          <div class="brand-identity">
+            <span class="site-icon" aria-hidden="true"><img src="assets/network.png" alt="" /></span>
+            <div class="brand-copy">
+              <h1>Studio IRF</h1>
+              <p class="eyebrow">L'application web pour communiquer sur les actions de l'IRF.</p>
+            </div>
+          </div>
+          <button class="primary-action" id="downloadButton" type="button"><img class="download-icon" src="assets/download.svg" alt="" aria-hidden="true" />Télécharger le visuel</button>
+        </div>
+
+        <div class="canvas-frame">
+          <canvas id="posterCanvas" width="1080" height="1080" aria-label="Montage Instagram"></canvas>
+        </div>
+      </section>
+
+      <aside class="panel" aria-label="Parametres du montage">
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>Photos</h2>
+            <span id="photoCount">0/5</span>
+          </div>
+          <label class="upload-zone" for="photoInput">
+            <input id="photoInput" type="file" accept="image/*" multiple />
+            <span>Ajouter jusqu'a 5 photographies</span>
+          </label>
+          <div id="photoList" class="photo-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>Gabarit</h2>
+            <span id="templateHint">Selection automatique</span>
+          </div>
+          <div id="templateGrid" class="template-grid"></div>
+        </section>
+
+        <section class="panel-section" id="locationSection" hidden>
+          <div class="section-heading"><h2>Localisation</h2></div>
+          <label>Ville<select id="locationCity"></select></label>
+          <label>Lieu de la formation<input id="locationLabel" type="text" maxlength="72" value="Bangkok, Thaïlande" /></label>
+          <label>Couleur du lieu
+            <select id="locationLabelColor">
+              <option value="#ffffff">Blanc</option>
+              <option value="#283178" selected>Bleu</option>
+              <option value="#ffca08">Jaune</option>
+              <option value="#101820">Noir</option>
+              <option value="#f57963">Corail</option>
+            </select>
+          </label>
+          <div class="location-actions" role="group" aria-labelledby="formationActionHeading">
+            <p id="formationActionHeading">Type d’action</p>
+            <label class="check-row"><input type="checkbox" name="locationAction" value="establishment" />Action de formation Établissement</label>
+            <label class="check-row"><input type="checkbox" name="locationAction" value="zone" />Action de formation Zone</label>
+            <label class="check-row"><input type="checkbox" name="locationAction" value="seminar" />Séminaire</label>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>Texte</h2>
+          </div>
+          <div class="text-fields-row">
+            <label>
+              Titre
+              <textarea id="titleInput" maxlength="140" rows="3">Formation des personnels</textarea>
+            </label>
+            <label>
+              Mention
+              <input id="metaInput" type="text" maxlength="72" value="Date et lieu" />
+            </label>
+          </div>
+          <label class="check-row">
+            <input id="metaToggle" type="checkbox" checked />
+            Afficher la mention
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>Texte libre</h2>
+            <button class="small-action" id="addTextButton" type="button">Ajouter</button>
+          </div>
+          <label>
+            Contenu
+            <textarea id="freeTextInput" maxlength="96" rows="3" placeholder="Titre de la formation, date, lieu..."></textarea>
+          </label>
+          <div class="control-row">
+            <label>
+              Taille
+              <input id="freeTextSize" type="range" min="24" max="86" value="42" />
+            </label>
+            <label>
+              Couleur
+              <select id="freeTextColor">
+                <option value="#ffffff">Blanc</option>
+                <option value="#ffca08">Jaune</option>
+                <option value="#283178">Bleu</option>
+              </select>
+            </label>
+          </div>
+          <label class="check-row">
+            <input id="freeTextBox" type="checkbox" checked />
+            Fond de texte
+          </label>
+          <div id="freeTextList" class="free-text-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <div class="section-heading">
+            <h2>Identite</h2>
+          </div>
+          <div class="identity-group" role="group" aria-labelledby="paletteHeading">
+            <h3 id="paletteHeading">Palette</h3>
+          <div class="theme-row" role="group" aria-label="Themes couleur">
+            <button class="theme-button is-active" data-theme="pacific" type="button" aria-label="Theme pacifique"><span aria-hidden="true" style="background-color: #283178"></span><span aria-hidden="true" style="background-color: #ffca08"></span><span aria-hidden="true" style="background-color: #ffffff"></span></button>
+            <button class="theme-button" data-theme="coral" type="button" aria-label="Theme corail"><span aria-hidden="true" style="background-color: #c20f7a"></span><span aria-hidden="true" style="background-color: #ffffff"></span></button>
+            <button class="theme-button" data-theme="ink" type="button" aria-label="Theme etiquettes"><span aria-hidden="true" style="background-color: #73c7b8"></span><span aria-hidden="true" style="background-color: #ffd22e"></span></button>
+            <button class="theme-button" data-theme="orion" type="button" aria-label="Theme Orion" title="Orion"><span aria-hidden="true" style="background-color: #45476e"></span><span aria-hidden="true" style="background-color: #53679f"></span><span aria-hidden="true" style="background-color: #f57963"></span><span aria-hidden="true" style="background-color: #ffffff"></span></button>
+          </div>
+          </div>
+          <div class="identity-group" role="group" aria-labelledby="logosHeading">
+            <h3 id="logosHeading">Logos</h3>
+          <div class="identity-options">
+            <label class="check-row">
+              <input id="aefeLogoToggle" type="checkbox" checked />
+              Logo AEFE
+            </label>
+            <label class="check-row">
+              <input id="zoneLogoToggle" type="checkbox" checked />
+              Logo zone
+            </label>
+            <label class="check-row">
+              <input id="marianneToggle" type="checkbox" checked />
+              Marianne
+            </label>
+            <label class="check-row">
+              <input id="rucheLogoToggle" type="checkbox" />
+              La Ruche
+            </label>
+          </div>
+          </div>
+        </section>
+
+        <section class="panel-section output-section">
+          <div class="section-heading">
+            <h2>Sortie</h2>
+          </div>
+          <p class="output-note">Image carree Instagram prete a publier : PNG, 1080 x 1080 px.</p>
+          <button class="primary-action full-width" id="downloadButtonPanel" type="button"><img class="download-icon" src="assets/download.svg" alt="" aria-hidden="true" />Télécharger le visuel</button>
+        </section>
+      </aside>
+    </main>
+
+    <script src="assets/d3.min.js"></script>
+    <script src="assets/world-land.js"></script>
+    <script src="app.js?v=20261007-85"></script>
+  </body>
+</html>
