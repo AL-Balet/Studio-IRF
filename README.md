@@ -58,12 +58,8 @@ Les ressources nécessaires sont incluses dans le projet : l'application fonctio
 
 Les photographies sont traitées dans le navigateur, sans envoi vers un serveur. Les fichiers originaux ne sont pas modifiés.
 
-La composition n'est pas sauvegardée automatiquement : télécharger le visuel avant de fermer ou de recharger la page. Le PNG exporté est une image finale, pas un fichier de projet rééditable.
-
-Avant toute publication, vérifier les droits d'utilisation des photographies, le consentement des personnes représentées et les règles de communication applicables.
+La composition n'est pas sauvegardée automatiquement : télécharger le visuel avant de fermer ou de recharger la page. Le PNG exporté est une image finale, pas un fichier de projet rééditable. Avant toute publication, vérifier les droits d'utilisation des photographies, le consentement des personnes représentées et les règles de communication applicables.
 
 ## Ressources et droits
 
-D3 est distribué sous licence ISC (`assets/d3-LICENSE.txt`). Les icônes Lucide sont distribuées sous licence ISC (`assets/lucide-LICENSE.txt`). Les données géographiques Natural Earth sont dans le domaine public.
-
-Les logos et marques présents dans le projet restent la propriété de leurs titulaires. Leur présence dans le dépôt ne constitue pas une autorisation de réutilisation.
+D3 est distribué sous licence ISC (`assets/d3-LICENSE.txt`). Les icônes Lucide sont distribuées sous licence ISC (`assets/lucide-LICENSE.txt`). Les données géographiques Natural Earth sont dans le domaine public. Les logos et marques présents dans le projet restent la propriété de leurs titulaires. Leur présence dans le dépôt ne constitue pas une autorisation de réutilisation.
