@@ -65,18 +65,18 @@ const themes = {
     ink: "#c20f7a",
     muted: "#6a4260",
     accent: "#ffffff",
-    accent2: "#ffca08",
+    accent2: "#393d6a",
     cream: "#ffffff",
     ghost: "#ffffff",
   },
   ink: {
-    bg: "#9bd4cc",
-    ink: "#063d73",
-    muted: "#0b5a83",
-    accent: "#ffd22e",
-    accent2: "#ffffff",
+    bg: "#034059",
+    ink: "#034059",
+    muted: "#03658c",
+    accent: "#ffe456",
+    accent2: "#45b29d",
     cream: "#ffffff",
-    ghost: "#063d73",
+    ghost: "#ffffff",
   },
   orion: {
     bg: "#45476e",
@@ -1478,7 +1478,7 @@ function drawDecorations(theme) {
     [state.showChevrons, state.logos.chevrons, state.chevronGroups],
   ].forEach(([visible, asset, groups]) => {
     if (!visible || !asset) return;
-    const image = getLogoMask(asset, theme.accent);
+    const image = getLogoMask(asset, ["ink", "coral"].includes(state.theme) ? theme.accent2 : theme.accent);
     groups.forEach((group) => {
       const rect = applyElementTransform(baseElement(group.id));
       ctx.save();
