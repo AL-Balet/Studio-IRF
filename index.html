@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Studio IRF</title>
-    <link rel="stylesheet" href="styles.css?v=20261007-82" />
+    <link rel="stylesheet" href="styles.css?v=20261009-104" />
   </head>
   <body>
     <main class="app-shell">
@@ -36,6 +36,12 @@
             <span>Ajouter jusqu'a 5 photographies</span>
           </label>
           <div id="photoList" class="photo-list" aria-live="polite"></div>
+          <div class="blur-controls">
+            <label class="check-row"><input id="blurMode" type="checkbox" />Flouter un visage</label>
+            <label>Taille de la zone<input id="blurSize" type="range" min="30" max="240" value="90" /></label>
+            <button id="undoBlur" class="small-action" type="button" disabled>Annuler le dernier flou</button>
+            <button id="clearBlurs" class="small-action" type="button" disabled>Annuler tous les flous</button>
+          </div>
         </section>
 
         <section class="panel-section">
@@ -57,10 +63,14 @@
               <option value="#ffca08">Jaune</option>
               <option value="#101820">Noir</option>
               <option value="#f57963">Corail</option>
+              <option value="#9bd4cc">Bleu-vert</option>
             </select>
           </label>
+        </section>
+
+        <section class="panel-section" id="actionSection" hidden>
+          <div class="section-heading"><h2 id="formationActionHeading">Type d’action</h2></div>
           <div class="location-actions" role="group" aria-labelledby="formationActionHeading">
-            <p id="formationActionHeading">Type d’action</p>
             <label class="check-row"><input type="checkbox" name="locationAction" value="establishment" />Action de formation Établissement</label>
             <label class="check-row"><input type="checkbox" name="locationAction" value="zone" />Action de formation Zone</label>
             <label class="check-row"><input type="checkbox" name="locationAction" value="seminar" />Séminaire</label>
@@ -107,6 +117,7 @@
                 <option value="#ffffff">Blanc</option>
                 <option value="#ffca08">Jaune</option>
                 <option value="#283178">Bleu</option>
+                <option value="#f57963">Corail</option>
               </select>
             </label>
           </div>
@@ -153,6 +164,28 @@
           </div>
         </section>
 
+        <section class="panel-section">
+          <div class="section-heading"><h2>Décoration</h2></div>
+          <div class="decoration-row">
+            <span>Confettis</span>
+            <button id="addConfetti" class="small-action" type="button" aria-label="Ajouter des confettis">Ajouter</button>
+            <button id="removeConfetti" class="small-action" type="button" aria-label="Retirer les confettis sélectionnés" disabled>Retirer</button>
+          </div>
+          <div class="decoration-row">
+            <span>Points</span>
+            <button id="addPoints" class="small-action" type="button" aria-label="Ajouter des points">Ajouter</button>
+            <button id="removePoints" class="small-action" type="button" aria-label="Retirer les points sélectionnés" disabled>Retirer</button>
+          </div>
+          <div class="decoration-row">
+            <span>Chevrons</span>
+            <button id="addChevrons" class="small-action" type="button" aria-label="Ajouter des chevrons">Ajouter</button>
+            <button id="removeChevrons" class="small-action" type="button" aria-label="Retirer les chevrons sélectionnés" disabled>Retirer</button>
+          </div>
+          <label for="chevronsRotation">Rotation <output id="chevronsRotationValue" for="chevronsRotation">0°</output>
+            <input id="chevronsRotation" type="range" min="-180" max="180" step="5" value="0" disabled />
+          </label>
+        </section>
+
         <section class="panel-section output-section">
           <div class="section-heading">
             <h2>Sortie</h2>
@@ -165,6 +198,6 @@
 
     <script src="assets/d3.min.js"></script>
     <script src="assets/world-land.js"></script>
-    <script src="app.js?v=20261007-85"></script>
+    <script src="app.js?v=20261009-116"></script>
   </body>
 </html>

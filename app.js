@@ -5,6 +5,9 @@ const ASSET_VERSION = "20261007-73";
 
 const state = {
   photos: [],
+  blurMode: false,
+  blurPointer: null,
+  blurHistory: [],
   templateId: "feature",
   theme: "pacific",
   title: "Formation des personnels",
@@ -14,10 +17,20 @@ const state = {
   showZoneLogo: true,
   showMarianne: true,
   showRucheLogo: false,
+  showConfetti: false,
+  confettiGroups: [],
+  nextConfettiId: 0,
+  showPoints: false,
+  pointGroups: [],
+  nextPointsId: 0,
+  showChevrons: false,
+  chevronGroups: [],
+  nextChevronsId: 0,
   location: { label: "Bangkok, Thaïlande", latitude: 13.7563, longitude: 100.5018 },
   locationLabelColor: "#283178",
   locationActions: { establishment: false, zone: false, seminar: false },
   textBlocks: [],
+  locationTextInitialized: false,
   selectedTextId: null,
   draggingText: null,
   elementOffsets: {},
@@ -31,6 +44,9 @@ const state = {
     zone: null,
     marianne: null,
     ruche: null,
+    confetti: null,
+    points: null,
+    chevrons: null,
   },
 };
 
@@ -86,11 +102,11 @@ const templates = [
     name: "Photos rectangles",
     counts: [1, 2, 3, 4, 5],
     layout(count) {
-      if (count === 1) return [{ x: 70, y: 72, w: 940, h: 760 }];
-      if (count === 2) return [{ x: 70, y: 72, w: 458, h: 760 }, { x: 552, y: 72, w: 458, h: 760 }];
-      if (count === 3) return [{ x: 70, y: 72, w: 580, h: 760 }, { x: 666, y: 72, w: 344, h: 372 }, { x: 666, y: 460, w: 344, h: 372 }];
-      if (count === 4) return [{ x: 70, y: 72, w: 458, h: 470 }, { x: 552, y: 72, w: 458, h: 300 }, { x: 70, y: 566, w: 458, h: 266 }, { x: 552, y: 396, w: 458, h: 436 }];
-      return [{ x: 70, y: 72, w: 458, h: 470 }, { x: 552, y: 72, w: 458, h: 300 }, { x: 70, y: 566, w: 220, h: 266 }, { x: 308, y: 566, w: 220, h: 266 }, { x: 552, y: 396, w: 458, h: 436 }];
+      if (count === 1) return [{ x: 70, y: 117, w: 940, h: 760 }];
+      if (count === 2) return [{ x: 70, y: 117, w: 458, h: 760 }, { x: 552, y: 117, w: 458, h: 760 }];
+      if (count === 3) return [{ x: 70, y: 117, w: 580, h: 760 }, { x: 666, y: 117, w: 344, h: 372 }, { x: 666, y: 505, w: 344, h: 372 }];
+      if (count === 4) return [{ x: 70, y: 117, w: 458, h: 470 }, { x: 552, y: 117, w: 458, h: 300 }, { x: 70, y: 611, w: 458, h: 266 }, { x: 552, y: 441, w: 458, h: 436 }];
+      return [{ x: 70, y: 117, w: 458, h: 470 }, { x: 552, y: 117, w: 458, h: 300 }, { x: 70, y: 611, w: 220, h: 266 }, { x: 308, y: 611, w: 220, h: 266 }, { x: 552, y: 441, w: 458, h: 436 }];
     },
     icon: "panels-top-left",
   },
@@ -170,15 +186,21 @@ const elements = {
 };
 
 async function init() {
-  const [aefe, zone, marianne, ruche, aefeOriginal] = await Promise.all([
+  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons] = await Promise.all([
     loadImage(assetUrl("assets/aefe-logo-blanc.png")),
     loadImage(assetUrl("assets/irf-aefe-asie-pacifique.png")),
     loadImage(assetUrl("assets/marianne.png")),
     loadImage(assetUrl("assets/la-ruche.png")),
     loadImage(assetUrl("assets/aefe-logo.svg")),
+    loadImage(assetUrl("assets/confettis.png")),
+    loadImage(assetUrl("assets/points.png")),
+    loadImage(assetUrl("assets/chevrons.png")),
   ]);
   state.logos.aefe = aefe;
   state.logos.aefeOriginal = aefeOriginal;
+  state.logos.confetti = confetti;
+  state.logos.points = points;
+  state.logos.chevrons = chevrons;
   state.logos.zone = zone;
   state.logos.marianne = marianne;
   state.logos.ruche = ruche;
@@ -189,6 +211,75 @@ async function init() {
 }
 
 function bindEvents() {
+  document.addEventListener("keydown", deleteSelectedItem);
+  document.querySelector("#chevronsRotation").addEventListener("input", (event) => {
+    const group = state.chevronGroups.find((item) => item.id === state.selectedElementId);
+    if (!group) return;
+    group.rotation = Number(event.target.value);
+    draw();
+  });
+  document.querySelector("#addChevrons").addEventListener("click", () => {
+    addChevronsGroup();
+    draw();
+  });
+  document.querySelector("#removeChevrons").addEventListener("click", () => {
+    const id = state.selectedElementId;
+    state.chevronGroups = state.chevronGroups.filter((group) => group.id !== id);
+    for (const key of Object.keys(state.elementOffsets)) if (key.endsWith(`:${id}`)) delete state.elementOffsets[key];
+    for (const key of Object.keys(state.elementScales)) if (key.endsWith(`:${id}`)) delete state.elementScales[key];
+    state.selectedElementId = null;
+    draw();
+  });
+  document.querySelector("#addPoints").addEventListener("click", () => {
+    addPointsGroup();
+    draw();
+  });
+  document.querySelector("#removePoints").addEventListener("click", () => {
+    const id = state.selectedElementId;
+    state.pointGroups = state.pointGroups.filter((group) => group.id !== id);
+    for (const key of Object.keys(state.elementOffsets)) if (key.endsWith(`:${id}`)) delete state.elementOffsets[key];
+    for (const key of Object.keys(state.elementScales)) if (key.endsWith(`:${id}`)) delete state.elementScales[key];
+    state.selectedElementId = null;
+    draw();
+  });
+  document.querySelector("#addConfetti").addEventListener("click", () => {
+    addConfettiGroup();
+    draw();
+  });
+  document.querySelector("#removeConfetti").addEventListener("click", () => {
+    const id = state.selectedElementId;
+    state.confettiGroups = state.confettiGroups.filter((group) => group.id !== id);
+    for (const key of Object.keys(state.elementOffsets)) if (key.endsWith(`:${id}`)) delete state.elementOffsets[key];
+    for (const key of Object.keys(state.elementScales)) if (key.endsWith(`:${id}`)) delete state.elementScales[key];
+    state.selectedElementId = null;
+    draw();
+  });
+  document.querySelector("#blurMode").addEventListener("change", (event) => {
+    state.blurMode = event.target.checked;
+    state.blurPointer = null;
+    canvas.style.cursor = state.blurMode ? "crosshair" : "";
+    state.selectedElementId = null;
+    draw();
+  });
+  document.querySelector("#undoBlur").addEventListener("click", () => {
+    let photo;
+    do { photo = state.blurHistory.pop(); } while (photo && !state.photos.includes(photo));
+    if (photo) {
+      photo.blurZones.pop();
+      photo.blurredImage = null;
+    }
+    updateBlurButtons();
+    draw();
+  });
+  document.querySelector("#clearBlurs").addEventListener("click", () => {
+    state.photos.forEach((photo) => {
+      photo.blurZones = [];
+      photo.blurredImage = null;
+    });
+    state.blurHistory = [];
+    updateBlurButtons();
+    draw();
+  });
   document.querySelectorAll('input[name="locationAction"]').forEach((input) => {
     input.addEventListener("change", () => {
       document.querySelectorAll('input[name="locationAction"]').forEach((option) => {
@@ -268,6 +359,11 @@ function bindEvents() {
   canvas.addEventListener("pointermove", moveTextDrag);
   canvas.addEventListener("pointerup", stopTextDrag);
   canvas.addEventListener("pointerleave", stopTextDrag);
+  canvas.addEventListener("pointerleave", () => {
+    state.blurPointer = null;
+    draw();
+  });
+  document.querySelector("#blurSize").addEventListener("input", () => draw());
 
   document.querySelectorAll(".theme-button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -300,6 +396,24 @@ function renderTemplatePicker() {
     button.innerHTML = `<img class="template-icon" aria-hidden="true" alt="" src="assets/template-${template.icon}.svg" /><span class="template-title">${template.name}</span>`;
     button.addEventListener("click", () => {
       state.templateId = template.id;
+      if (template.id === "location" && !state.locationTextInitialized) {
+        state.locationTextInitialized = true;
+        const block = {
+          id: "location-free-text",
+          templateId: "location",
+          text: "Informations complémentaires",
+          x: 90,
+          y: 430,
+          size: 32,
+          color: "#ffffff",
+          box: false,
+        };
+        state.textBlocks.push(block);
+        state.selectedTextId = block.id;
+        state.selectedElementId = null;
+        syncTextControls();
+      }
+      if (selectedTextBlock() && !isTextBlockVisible(selectedTextBlock())) state.selectedTextId = null;
       update();
     });
     elements.templateGrid.appendChild(button);
@@ -357,9 +471,14 @@ function addTextBlock() {
   update();
 }
 
+function isTextBlockVisible(block) {
+  return !block.templateId || block.templateId === currentTemplate().id;
+}
+
 function renderTextList() {
   elements.freeTextList.innerHTML = "";
   state.textBlocks.forEach((block) => {
+    if (!isTextBlockVisible(block)) return;
     const item = document.createElement("div");
     item.className = "free-text-item";
     item.classList.toggle("is-active", block.id === state.selectedTextId);
@@ -381,6 +500,7 @@ function renderTextList() {
 
 function selectTextBlock(id) {
   state.selectedTextId = id;
+  state.selectedElementId = null;
   syncTextControls();
   renderTextList();
   draw();
@@ -410,7 +530,13 @@ function updateSelectedText() {
   draw();
 }
 
+function updateBlurButtons() {
+  document.querySelector("#undoBlur").disabled = !state.blurHistory.some((photo) => state.photos.includes(photo) && photo.blurZones?.length);
+  document.querySelector("#clearBlurs").disabled = !state.photos.some((photo) => photo.blurZones?.length);
+}
+
 function update() {
+  updateBlurButtons();
   renderPhotoList();
   renderTextList();
   updateTemplateCards();
@@ -421,6 +547,7 @@ function updateTemplateCards() {
   const count = photoCount();
   const current = currentTemplate();
   elements.locationSection.hidden = current.kind !== "location";
+  document.querySelector("#actionSection").hidden = !["location", "poster"].includes(current.kind);
   document.querySelectorAll(".template-card").forEach((button) => {
     const template = templates.find((item) => item.id === button.dataset.template);
     const available = template.counts.includes(count);
@@ -431,7 +558,88 @@ function updateTemplateCards() {
   elements.templateHint.textContent = current.kind === "location" ? current.name : `${current.name} - ${count || 1} photo${count > 1 ? "s" : ""}`;
 }
 
+function deleteSelectedItem(event) {
+  if (!["Delete", "Backspace"].includes(event.key) || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
+  const target = event.target;
+  if (target?.closest?.("input, textarea, select, [role='textbox']") || target?.isContentEditable) return;
+  const types = [
+    [state.showConfetti, state.confettiGroups, "#removeConfetti"],
+    [state.showPoints, state.pointGroups, "#removePoints"],
+    [state.showChevrons, state.chevronGroups, "#removeChevrons"],
+  ];
+  const selected = types.find(([visible, groups]) => visible && groups.some((group) => group.id === state.selectedElementId));
+  if (selected) {
+    event.preventDefault();
+    document.querySelector(selected[2]).click();
+    return;
+  }
+  const text = selectedTextBlock();
+  if (!text || !isTextBlockVisible(text)) return;
+  event.preventDefault();
+  state.textBlocks = state.textBlocks.filter((block) => block.id !== text.id);
+  state.selectedTextId = null;
+  update();
+}
+
+function addConfettiGroup() {
+  const index = state.confettiGroups.length;
+  const group = { id: `confetti-${state.nextConfettiId++}`, x: 720 - (index % 3) * 240, y: 160 + (index % 3) * 140 };
+  state.confettiGroups.push(group);
+  state.showConfetti = true;
+  state.selectedElementId = group.id;
+  state.selectedTextId = null;
+}
+
+function addPointsGroup() {
+  const index = state.pointGroups.length;
+  const group = { id: `points-${state.nextPointsId++}`, x: 80 + (index % 3) * 240, y: 160 + (index % 3) * 140 };
+  state.pointGroups.push(group);
+  state.showPoints = true;
+  state.selectedElementId = group.id;
+  state.selectedTextId = null;
+}
+
+function addChevronsGroup() {
+  const index = state.chevronGroups.length;
+  const group = { id: `chevrons-${state.nextChevronsId++}`, x: 720 - (index % 3) * 240, y: 480 - (index % 3) * 140 };
+  state.chevronGroups.push(group);
+  state.showChevrons = true;
+  state.selectedElementId = group.id;
+  state.selectedTextId = null;
+}
+
 function draw(options = {}) {
+  const selectedChevron = state.showChevrons && state.chevronGroups.find((group) => group.id === state.selectedElementId);
+  const rotationInput = document.querySelector("#chevronsRotation");
+  rotationInput.disabled = !selectedChevron;
+  rotationInput.value = selectedChevron?.rotation || 0;
+  document.querySelector("#chevronsRotationValue").textContent = `${rotationInput.value}°`;
+  document.querySelector("#removeChevrons").disabled = !state.showChevrons || !state.chevronGroups.some((group) => group.id === state.selectedElementId);
+  document.querySelector("#removePoints").disabled = !state.showPoints || !state.pointGroups.some((group) => group.id === state.selectedElementId);
+  document.querySelector("#removeConfetti").disabled = !state.showConfetti || !state.confettiGroups.some((group) => group.id === state.selectedElementId);
+  drawComposition(options);
+  const decorationSelected = [
+    [state.showConfetti, state.confettiGroups],
+    [state.showPoints, state.pointGroups],
+    [state.showChevrons, state.chevronGroups],
+  ].some(([visible, groups]) => visible && groups.some((group) => group.id === state.selectedElementId));
+  if (options.showSelection !== false && decorationSelected) drawImageResizeHandle(themes[state.theme]);
+  if (options.showSelection === false || !state.blurMode || !state.blurPointer || !hitBlurPhoto(state.blurPointer)) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(state.blurPointer.x, state.blurPointer.y, Number(document.querySelector("#blurSize").value) / 2, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(255,255,255,0.15)";
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.strokeStyle = "#283178";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawComposition(options = {}) {
   const showSelection = options.showSelection !== false;
   const theme = themes[state.theme];
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -473,7 +681,9 @@ function draw(options = {}) {
     });
   }
 
-  if (template.id === "feature") drawMarianne(isMosaicLayout() ? 64 : 59, isMosaicLayout() ? 30 : 35, 132, 48, "marianne");
+  drawTopBand(theme);
+  drawDecorations(theme);
+  if (template.id === "feature") drawMarianne(isMosaicLayout() ? 64 : 59, 66, 132, 48, "marianne");
   drawFooter(theme, "footer");
   drawRucheLogo();
   if (showSelection) drawImageResizeHandle(theme);
@@ -483,7 +693,7 @@ function draw(options = {}) {
 function locationProjection() {
   const coordinates = [state.location.longitude, state.location.latitude];
   const center = d3.geoDistance([135, 15], coordinates) < Math.PI / 2 - 0.12 ? [135, 15] : coordinates;
-  const projection = d3.geoOrthographic().rotate([-center[0], -center[1]]).scale(315).translate([960, 505]).clipAngle(90);
+  const projection = d3.geoOrthographic().rotate([-center[0], -center[1]]).scale(315).translate([960, 520]).clipAngle(90);
   if (projection(coordinates)[0] > 1040) projection.rotate([-coordinates[0], -coordinates[1]]);
   return projection;
 }
@@ -496,12 +706,12 @@ function locationLabelLayout() {
   const lines = text ? getTextLines(text, 26, width) : [];
   const height = lines.length * 30;
   const x = left ? pointX - 24 - width : pointX + 24;
-  const y = clamp(pointY - height / 2, 187.5, 822.5 - height);
-  const globe = applyElementTransform(rectElement("location-globe", 622.5, 167.5, 675, 675, true));
+  const y = clamp(pointY - height / 2, 202.5, 837.5 - height);
+  const globe = applyElementTransform(rectElement("location-globe", 622.5, 182.5, 675, 675, true));
   const scale = globe.w / 675;
   return {
     x: globe.x + (x - 622.5) * scale,
-    y: globe.y + (y - 167.5) * scale,
+    y: globe.y + (y - 182.5) * scale,
     w: width * scale,
     h: height * scale,
     size: 26 * scale,
@@ -518,6 +728,7 @@ function formationActionLayout() {
   const width = Math.ceil(Math.max(0, ...lines.map((line) => ctx.measureText(line).width))) + 48;
   ctx.restore();
   const height = lines.length * 32 + 32;
+  if (currentTemplate().kind === "poster") return { x: 70, y: 1040 - height, w: width, h: height, lines };
   const layout = locationTitleLayout();
   const lastRow = layout.meta.at(-1) || layout.title.at(-1);
   const title = applyElementTransform(rectElement("location-title", 70, 132, 940, 170, true));
@@ -529,7 +740,7 @@ function formationActionLayout() {
 
 function locationTextSpan(baseline, size) {
   const text = applyElementTransform(rectElement("location-title", 70, 132, 940, 170, true));
-  const globe = applyElementTransform(rectElement("location-globe", 622.5, 167.5, 675, 675, true));
+  const globe = applyElementTransform(rectElement("location-globe", 622.5, 182.5, 675, 675, true));
   const scale = text.w / 940;
   const radius = 315 * globe.w / 675;
   const centerX = globe.x + globe.w / 2;
@@ -591,7 +802,7 @@ function locationTitleLayout() {
 }
 
 function drawLocationTemplate(theme, showSelection) {
-  drawMarianne(876, 48, 132, 48, "marianne");
+  drawMarianne(876, 66, 132, 48, "marianne");
   drawResizableElement("location-globe", () => {
     const projection = locationProjection();
     const path = d3.geoPath(projection, ctx);
@@ -603,7 +814,7 @@ function drawLocationTemplate(theme, showSelection) {
     ctx.clip();
     ctx.beginPath();
     path(window.STUDIO_IRF_LAND);
-    ctx.fillStyle = theme.ink;
+    ctx.fillStyle = theme.bg;
     ctx.fill();
     ctx.beginPath();
     path(d3.geoGraticule10());
@@ -625,14 +836,22 @@ function drawLocationTemplate(theme, showSelection) {
     ctx.restore();
   });
   const label = locationLabelLayout();
+  drawDecorations(theme);
   if (label.lines.length) drawResizableElement("location-label", () => {
     ctx.textAlign = label.left ? "right" : "left";
     ctx.textBaseline = "middle";
     ctx.font = `900 ${label.size}px system-ui, sans-serif`;
-    ctx.fillStyle = state.locationLabelColor;
     label.lines.forEach((line, index) => {
       const x = label.left ? label.x + label.w : label.x;
       const y = label.y + label.lineHeight * (index + 0.5);
+      const metrics = ctx.measureText(line);
+      const padding = label.size * 0.25;
+      const left = label.left ? x - metrics.width : x;
+      const ascent = metrics.actualBoundingBoxAscent;
+      const descent = metrics.actualBoundingBoxDescent;
+      ctx.fillStyle = ["#283178", "#101820"].includes(state.locationLabelColor) ? "#ffffff" : "#18204a";
+      ctx.fillRect(left - padding, y - ascent - padding, metrics.width + padding * 2, ascent + descent + padding * 2);
+      ctx.fillStyle = state.locationLabelColor;
       ctx.fillText(line, x, y);
     });
   });
@@ -648,6 +867,11 @@ function drawLocationTemplate(theme, showSelection) {
     layout.meta.forEach((row) => ctx.fillText(row.text, row.x, row.y));
   });
   drawLogoCluster(818, 984, theme, "logo-cluster");
+  drawFormationAction(theme);
+  if (showSelection) drawImageResizeHandle(theme);
+}
+
+function drawFormationAction(theme) {
   const actions = formationActionLayout();
   if (actions.lines.length) drawResizableElement("formation-actions", () => {
     ctx.fillStyle = theme.accent;
@@ -659,12 +883,10 @@ function drawLocationTemplate(theme, showSelection) {
     ctx.textBaseline = "middle";
     actions.lines.forEach((line, index) => ctx.fillText(line, actions.x + 24, actions.y + 32 + index * 32));
   });
-  if (showSelection) drawImageResizeHandle(theme);
 }
 
 function drawPosterTemplate(theme, showSelection = true) {
-  ctx.fillStyle = theme.accent;
-  ctx.fillRect(0, 0, 1080, 90);
+  drawTopBand(theme);
   drawMarianne(876, 66, 132, 48, "marianne");
 
   const title = state.title || "Formation des personnels";
@@ -675,6 +897,7 @@ function drawPosterTemplate(theme, showSelection = true) {
   const photo = state.photos[0];
   const posterPhoto = visualCircle(888, 480, 384, "photo-0");
   if (photo) drawCircleImage(photo.image, posterPhoto.cx, posterPhoto.cy, posterPhoto.radius);
+  drawDecorations(theme);
 
   drawResizableElement("poster-irf", () => {
     drawIrfWord(154, 420, 176, theme.accent);
@@ -687,11 +910,11 @@ function drawPosterTemplate(theme, showSelection = true) {
   });
 
   drawLogoCluster(818, 984, theme, "logo-cluster");
+  drawFormationAction(theme);
   if (showSelection) drawImageResizeHandle(theme);
 }
 
 function drawCircleTemplate(theme, showSelection = true) {
-  drawMarianne(876, 66, 132, 48, "marianne");
 
   const firstCircle = visualCircle(192, 238, 346, "photo-0");
   const secondCircle = visualCircle(792, 828, 370, "photo-1");
@@ -705,7 +928,10 @@ function drawCircleTemplate(theme, showSelection = true) {
     drawCircleImage(photo.image, point.cx, point.cy, point.radius);
   });
 
+  drawTopBand(theme);
+  drawMarianne(876, 66, 132, 48, "marianne");
   drawLogoCluster(24, 984, theme, "logo-cluster");
+  drawDecorations(theme);
   if (showSelection) drawImageResizeHandle(theme);
 }
 
@@ -720,12 +946,14 @@ function drawBackgroundMarks(theme) {
   ctx.font = "900 italic 360px Arial Black, Impact, system-ui, sans-serif";
   ctx.strokeText("ZAP", 122, 1068);
   ctx.globalAlpha = 1;
-  if (!isMosaicLayout()) {
-    ctx.fillStyle = theme.accent;
-    ctx.fillRect(0, 0, 1080, 18);
-  }
+  drawTopBand(theme);
+  ctx.restore();
+}
+
+function drawTopBand(theme) {
+  ctx.save();
   ctx.fillStyle = theme.accent;
-  ctx.fillRect(0, 862, 1080, 18);
+  ctx.fillRect(0, 0, 1080, 90);
   ctx.restore();
 }
 
@@ -818,6 +1046,7 @@ function getLogoMask(image, color) {
 
 function drawTextBlocks(theme, showSelection = true) {
   state.textBlocks.forEach((block) => {
+    if (!isTextBlockVisible(block)) return;
     const metrics = measureTextBlock(block);
     if (block.box) {
       ctx.fillStyle = block.color === "#ffffff" ? "rgba(40,49,120,0.82)" : "rgba(255,255,255,0.92)";
@@ -834,8 +1063,33 @@ function drawTextBlocks(theme, showSelection = true) {
   });
 }
 
+function hitBlurPhoto(point) {
+  return [...currentTemplateElements()].reverse().find((item) => {
+    if (!item.id.startsWith("photo-") || !state.photos[Number(item.id.slice(6))]) return false;
+    if (item.shape === "circle") return Math.hypot(point.x - (item.x + item.w / 2), point.y - (item.y + item.h / 2)) <= item.w / 2;
+    return point.x >= item.x && point.x <= item.x + item.w && point.y >= item.y && point.y <= item.y + item.h;
+  });
+}
+
 function startTextDrag(event) {
   const point = canvasPoint(event);
+  if (state.blurMode) {
+    state.blurPointer = point;
+    const hit = hitBlurPhoto(point);
+    if (!hit) return;
+    const photo = state.photos[Number(hit.id.slice(6))];
+    const image = photo.image;
+    const scale = Math.max(hit.w / image.width, hit.h / image.height);
+    const left = hit.x + (hit.w - image.width * scale) / 2;
+    const top = hit.y + (hit.h - image.height * scale) / 2;
+    photo.blurZones ||= [];
+    photo.blurZones.push({ x: (point.x - left) / (image.width * scale), y: (point.y - top) / (image.height * scale), radius: Number(document.querySelector("#blurSize").value) / (2 * scale * Math.min(image.width, image.height)) });
+    photo.blurredImage = null;
+    state.blurHistory.push(photo);
+    updateBlurButtons();
+    draw();
+    return;
+  }
   const hit = hitTextBlock(point.x, point.y);
   if (hit) {
     selectTextBlock(hit.id);
@@ -851,6 +1105,7 @@ function startTextDrag(event) {
   const resizeHit = hitResizeHandle(point.x, point.y);
   if (resizeHit) {
     state.selectedElementId = resizeHit.id;
+    state.selectedTextId = null;
     state.resizingElement = {
       id: resizeHit.id,
       startX: point.x,
@@ -865,6 +1120,7 @@ function startTextDrag(event) {
   const elementHit = hitTemplateElement(point.x, point.y);
   if (!elementHit) return;
   state.selectedElementId = elementHit.id;
+  state.selectedTextId = null;
   state.draggingElement = {
     id: elementHit.id,
     offsetX: point.x - elementHit.x,
@@ -876,6 +1132,11 @@ function startTextDrag(event) {
 
 function moveTextDrag(event) {
   const point = canvasPoint(event);
+  if (state.blurMode) {
+    state.blurPointer = point;
+    draw();
+    return;
+  }
   if (state.draggingText) {
     const block = state.textBlocks.find((item) => item.id === state.draggingText.id);
     if (!block) return;
@@ -908,6 +1169,7 @@ function stopTextDrag() {
 function hitTextBlock(x, y) {
   for (let index = state.textBlocks.length - 1; index >= 0; index -= 1) {
     const block = state.textBlocks[index];
+    if (!isTextBlockVisible(block)) continue;
     const metrics = measureTextBlock(block);
     if (x >= metrics.x - 28 && x <= metrics.x + metrics.width + 28 && y >= metrics.top - 12 && y <= metrics.top + metrics.height + 12) {
       return block;
@@ -920,6 +1182,16 @@ function hitTemplateElement(x, y) {
   const hitList = currentTemplateElements();
   for (let index = hitList.length - 1; index >= 0; index -= 1) {
     const item = hitList[index];
+    const chevron = state.chevronGroups.find((group) => group.id === item.id);
+    if (chevron) {
+      const angle = -(chevron.rotation || 0) * Math.PI / 180;
+      const dx = x - (item.x + item.w / 2);
+      const dy = y - (item.y + item.h / 2);
+      const localX = dx * Math.cos(angle) - dy * Math.sin(angle);
+      const localY = dx * Math.sin(angle) + dy * Math.cos(angle);
+      if (Math.abs(localX) <= item.w / 2 && Math.abs(localY) <= item.h / 2) return item;
+      continue;
+    }
     if (item.textRows && !item.textRows.some((row) => x >= row.x - 6 && x <= row.x + row.w + 6 && y >= row.y && y <= row.y + row.h)) continue;
     if (x >= item.x && x <= item.x + item.w && y >= item.y && y <= item.y + item.h) {
       return item;
@@ -956,6 +1228,9 @@ function resizeHandleRect(item) {
 
 function currentTemplateElements() {
   const items = rawTemplateElements();
+  if (state.showConfetti) state.confettiGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 300, 278, true)));
+  if (state.showPoints) state.pointGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 300, 300, true)));
+  if (state.showChevrons) state.chevronGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 225, 225, true)));
   if (state.showRucheLogo) items.push(rectElement("ruche-logo", 890, 140, 112, 126, true));
   return items.map((item) => {
     const transformed = applyElementTransform(item);
@@ -980,8 +1255,8 @@ function rawTemplateElements() {
     const label = locationLabelLayout();
     const actions = formationActionLayout();
     return [
-      rectElement("marianne", 876, 48, 132, 48),
-      rectElement("location-globe", 622.5, 167.5, 675, 675, true),
+      rectElement("marianne", 876, 66, 132, 48),
+      rectElement("location-globe", 622.5, 182.5, 675, 675, true),
       ...(label.lines.length ? [rectElement("location-label", label.x, label.y, label.w, label.h, true)] : []),
       rectElement("location-title", 70, 132, 940, 170, true),
       rectElement("logo-cluster", 818, 972, 238, 82),
@@ -989,6 +1264,7 @@ function rawTemplateElements() {
     ];
   }
   if (template.kind === "poster") {
+    const actions = formationActionLayout();
     return [
       rectElement("marianne", 876, 66, 132, 48),
       rectElement("poster-title", 94, 548, 640, 280),
@@ -996,6 +1272,7 @@ function rawTemplateElements() {
       rectElement("poster-irf", 154, 272, 360, 170, true),
       rectElement("labels-group", 132, 172, 282, 150, true),
       rectElement("logo-cluster", 818, 972, 238, 82),
+      ...(actions.lines.length ? [rectElement("formation-actions", actions.x, actions.y, actions.w, actions.h)] : []),
     ];
   }
   if (template.kind === "circles") {
@@ -1012,7 +1289,7 @@ function rawTemplateElements() {
   }
 
   const rects = template.layout(Math.max(photoCount(), 1)).map((rect, index) => rectElement(`photo-${index}`, rect.x, rect.y, rect.w, rect.h, true));
-  if (template.id === "feature") rects.push(rectElement("marianne", isMosaicLayout() ? 64 : 59, isMosaicLayout() ? 30 : 35, 132, 48));
+  if (template.id === "feature") rects.push(rectElement("marianne", isMosaicLayout() ? 64 : 59, 66, 132, 48));
   rects.push(rectElement("footer", 70, 900, 940, isMosaicLayout() ? 130 : 140));
   return rects;
 }
@@ -1076,7 +1353,7 @@ function getElementOffset(elementId) {
 
 function getElementScale(elementId) {
   if (!elementId) return 1;
-  return state.elementScales[elementOffsetKey(elementId)] || 1;
+  return state.elementScales[elementOffsetKey(elementId)] || (elementId === "location-globe" ? 1.1 : 1);
 }
 
 function setElementScale(elementId, scale) {
@@ -1094,6 +1371,12 @@ function setElementPosition(elementId, x, y) {
 }
 
 function baseElement(elementId) {
+  const chevrons = state.chevronGroups.find((group) => group.id === elementId);
+  if (chevrons) return rectElement(chevrons.id, chevrons.x, chevrons.y, 225, 225, true);
+  const points = state.pointGroups.find((group) => group.id === elementId);
+  if (points) return rectElement(points.id, points.x, points.y, 300, 300, true);
+  const confetti = state.confettiGroups.find((group) => group.id === elementId);
+  if (confetti) return rectElement(confetti.id, confetti.x, confetti.y, 300, 278, true);
   if (elementId === "ruche-logo") return rectElement("ruche-logo", 890, 140, 112, 126, true);
   return rawTemplateElements()
     .find((item) => item.id === elementId);
@@ -1184,6 +1467,27 @@ function drawRucheLogo() {
   ctx.closePath();
   ctx.clip();
   ctx.drawImage(state.logos.ruche, 408, 214, 558, 628, 0, 0, 558, 628);
+  ctx.restore();
+}
+
+function drawDecorations(theme) {
+  ctx.save();
+  [
+    [state.showConfetti, state.logos.confetti, state.confettiGroups],
+    [state.showPoints, state.logos.points, state.pointGroups],
+    [state.showChevrons, state.logos.chevrons, state.chevronGroups],
+  ].forEach(([visible, asset, groups]) => {
+    if (!visible || !asset) return;
+    const image = getLogoMask(asset, theme.accent);
+    groups.forEach((group) => {
+      const rect = applyElementTransform(baseElement(group.id));
+      ctx.save();
+      ctx.translate(rect.x + rect.w / 2, rect.y + rect.h / 2);
+      ctx.rotate((group.rotation || 0) * Math.PI / 180);
+      ctx.drawImage(image, -rect.w / 2, -rect.h / 2, rect.w, rect.h);
+      ctx.restore();
+    });
+  });
   ctx.restore();
 }
 
@@ -1342,8 +1646,48 @@ function drawImageCover(image, rect, radius) {
   const scale = Math.max(rect.w / image.width, rect.h / image.height);
   const width = image.width * scale;
   const height = image.height * scale;
-  ctx.drawImage(image, rect.x + (rect.w - width) / 2, rect.y + (rect.h - height) / 2, width, height);
+  const photo = state.photos.find((item) => item.image === image);
+  ctx.drawImage(photo ? blurredPhotoImage(photo) : image, rect.x + (rect.w - width) / 2, rect.y + (rect.h - height) / 2, width, height);
   ctx.restore();
+}
+
+function blurredPhotoImage(photo) {
+  if (!photo.blurZones?.length) return photo.image;
+  if (photo.blurredImage) return photo.blurredImage;
+  const output = document.createElement("canvas");
+  const scale = Math.min(1, 2048 / Math.max(photo.image.width, photo.image.height));
+  output.width = Math.round(photo.image.width * scale);
+  output.height = Math.round(photo.image.height * scale);
+  const context = output.getContext("2d");
+  context.drawImage(photo.image, 0, 0, output.width, output.height);
+  photo.blurZones.forEach((zone) => {
+    const radius = zone.radius * Math.min(output.width, output.height);
+    const x = zone.x * output.width;
+    const y = zone.y * output.height;
+    const patch = document.createElement("canvas");
+    patch.width = 6;
+    patch.height = 6;
+    patch.getContext("2d").drawImage(output, x - radius, y - radius, radius * 2, radius * 2, 0, 0, 6, 6);
+    const outerRadius = radius * 1.3;
+    const layer = document.createElement("canvas");
+    layer.width = layer.height = Math.ceil(outerRadius * 2);
+    const layerCtx = layer.getContext("2d");
+    const center = layer.width / 2;
+    layerCtx.imageSmoothingQuality = "high";
+    layerCtx.filter = `blur(${Math.max(2, radius / 6)}px)`;
+    layerCtx.drawImage(patch, -radius, -radius, layer.width + radius * 2, layer.height + radius * 2);
+    layerCtx.filter = "none";
+    // Keep the face fully obscured and soften only the surrounding transition.
+    const mask = layerCtx.createRadialGradient(center, center, radius, center, center, outerRadius);
+    mask.addColorStop(0, "rgba(255,255,255,1)");
+    mask.addColorStop(1, "rgba(255,255,255,0)");
+    layerCtx.globalCompositeOperation = "destination-in";
+    layerCtx.fillStyle = mask;
+    layerCtx.fillRect(0, 0, layer.width, layer.height);
+    context.drawImage(layer, x - center, y - center);
+  });
+  photo.blurredImage = output;
+  return output;
 }
 
 function roundedRect(x, y, w, h, r) {

@@ -211,6 +211,34 @@ canvas:active {
   display: none;
 }
 
+.blur-controls {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.decoration-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.decoration-row > span {
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.decoration-row .small-action {
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+}
+
 .panel-section:first-child {
   padding-top: 0;
 }
