@@ -211,6 +211,10 @@ canvas:active {
   display: none;
 }
 
+#gridTextControls[hidden] {
+  display: none;
+}
+
 .blur-controls {
   display: grid;
   gap: 10px;

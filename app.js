@@ -5,6 +5,7 @@ const ASSET_VERSION = "20261007-73";
 
 const state = {
   photos: [],
+  gridText: "Votre texte",
   blurMode: false,
   blurPointer: null,
   blurHistory: [],
@@ -16,7 +17,7 @@ const state = {
   showAefeLogo: true,
   showZoneLogo: true,
   showMarianne: true,
-  showRucheLogo: false,
+  showRucheLogo: true,
   showConfetti: false,
   confettiGroups: [],
   nextConfettiId: 0,
@@ -43,6 +44,7 @@ const state = {
     aefeOriginal: null,
     zone: null,
     marianne: null,
+    devise: null,
     ruche: null,
     confetti: null,
     points: null,
@@ -124,6 +126,13 @@ const templates = [
     kind: "location",
     icon: "globe",
   },
+  {
+    id: "grid-seven",
+    name: "Grille 7 photos",
+    counts: [1, 2, 3, 4, 5, 6, 7],
+    kind: "grid-seven",
+    icon: "panels-top-left",
+  },
 ];
 
 const formationActions = [
@@ -186,7 +195,7 @@ const elements = {
 };
 
 async function init() {
-  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons] = await Promise.all([
+  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons, devise] = await Promise.all([
     loadImage(assetUrl("assets/aefe-logo-blanc.png")),
     loadImage(assetUrl("assets/irf-aefe-asie-pacifique.png")),
     loadImage(assetUrl("assets/marianne.png")),
@@ -195,6 +204,7 @@ async function init() {
     loadImage(assetUrl("assets/confettis.png")),
     loadImage(assetUrl("assets/points.png")),
     loadImage(assetUrl("assets/chevrons.png")),
+    loadImage(assetUrl("assets/republique-francaise-devise.png")),
   ]);
   state.logos.aefe = aefe;
   state.logos.aefeOriginal = aefeOriginal;
@@ -203,6 +213,7 @@ async function init() {
   state.logos.chevrons = chevrons;
   state.logos.zone = zone;
   state.logos.marianne = marianne;
+  state.logos.devise = transparentDevise(devise);
   state.logos.ruche = ruche;
   elements.locationCity.innerHTML = trainingCities.map(([label], index) => `<option value="${index}">${escapeHtml(label)}</option>`).join("");
   renderTemplatePicker();
@@ -211,6 +222,10 @@ async function init() {
 }
 
 function bindEvents() {
+  document.querySelector("#gridTextInput").addEventListener("input", (event) => {
+    state.gridText = event.target.value;
+    draw();
+  });
   document.addEventListener("keydown", deleteSelectedItem);
   document.querySelector("#chevronsRotation").addEventListener("input", (event) => {
     const group = state.chevronGroups.find((item) => item.id === state.selectedElementId);
@@ -306,7 +321,7 @@ function bindEvents() {
     draw();
   });
   elements.photoInput.addEventListener("change", async (event) => {
-    const files = Array.from(event.target.files || []).slice(0, 5 - state.photos.length);
+    const files = Array.from(event.target.files || []).slice(0, Math.max(0, 7 - state.photos.length));
     const newPhotos = await Promise.all(files.map(readPhoto));
     state.photos.push(...newPhotos);
     event.target.value = "";
@@ -421,7 +436,7 @@ function renderTemplatePicker() {
 }
 
 function renderPhotoList() {
-  elements.photoCount.textContent = `${state.photos.length}/5`;
+  elements.photoCount.textContent = `${state.photos.length}/7`;
   elements.photoList.innerHTML = "";
   state.photos.forEach((photo, index) => {
     const item = document.createElement("div");
@@ -547,6 +562,7 @@ function updateTemplateCards() {
   const count = photoCount();
   const current = currentTemplate();
   elements.locationSection.hidden = current.kind !== "location";
+  document.querySelector("#gridTextControls").hidden = current.kind !== "grid-seven";
   document.querySelector("#actionSection").hidden = !["location", "poster"].includes(current.kind);
   document.querySelectorAll(".template-card").forEach((button) => {
     const template = templates.find((item) => item.id === button.dataset.template);
@@ -562,6 +578,14 @@ function deleteSelectedItem(event) {
   if (!["Delete", "Backspace"].includes(event.key) || event.isComposing || event.ctrlKey || event.metaKey || event.altKey) return;
   const target = event.target;
   if (target?.closest?.("input, textarea, select, [role='textbox']") || target?.isContentEditable) return;
+  if (state.selectedElementId === "ruche-logo" && state.showRucheLogo) {
+    event.preventDefault();
+    state.showRucheLogo = false;
+    elements.rucheLogoToggle.checked = false;
+    state.selectedElementId = null;
+    draw();
+    return;
+  }
   const types = [
     [state.showConfetti, state.confettiGroups, "#removeConfetti"],
     [state.showPoints, state.pointGroups, "#removePoints"],
@@ -646,6 +670,12 @@ function drawComposition(options = {}) {
   ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, 1080, 1080);
 
+  if (currentTemplate().kind === "grid-seven") {
+    drawSevenPhotoGrid(theme, showSelection);
+    drawTextBlocks(theme, showSelection);
+    return;
+  }
+
   drawBackgroundMarks(theme);
 
   const count = photoCount();
@@ -683,11 +713,68 @@ function drawComposition(options = {}) {
 
   drawTopBand(theme);
   drawDecorations(theme);
-  if (template.id === "feature") drawMarianne(isMosaicLayout() ? 64 : 59, 66, 132, 48, "marianne");
+  if (template.id === "feature") drawMarianne(26, 14, 132, 48, "marianne");
   drawFooter(theme, "footer");
   drawRucheLogo();
   if (showSelection) drawImageResizeHandle(theme);
   drawTextBlocks(theme, showSelection);
+}
+
+function sevenPhotoCells() {
+  return gridRects(3, 3, 70, 70, 940, 940, 16);
+}
+
+function sevenPhotoRects() {
+  const cells = sevenPhotoCells();
+  return [0, 1, 2, 3, 5, 6, 7].map((index) => cells[index]);
+}
+
+function gridCardTextLayout() {
+  const width = sevenPhotoCells()[8].w - 48;
+  let size = 32;
+  let lines;
+  ctx.save();
+  do {
+    lines = state.gridText.split(/\r\n|\r|\n/).flatMap((paragraph) => paragraph.trim() ? getTextLines(paragraph, size, width) : [""]);
+    ctx.font = `900 ${size}px system-ui, sans-serif`;
+    if (lines.length * size * 1.2 <= width && lines.every((line) => ctx.measureText(line).width <= width)) break;
+    size -= 1;
+  } while (size > 1);
+  ctx.restore();
+  return { lines, size, lineHeight: size * 1.2 };
+}
+
+function drawSevenPhotoGrid(theme, showSelection) {
+  sevenPhotoRects().forEach((rect, index) => {
+    const placed = visualRect(rect, `photo-${index}`);
+    if (state.photos[index]) drawImageCover(state.photos[index].image, placed, 0);
+    else {
+      ctx.fillStyle = "rgba(255,255,255,0.12)";
+      ctx.fillRect(placed.x, placed.y, placed.w, placed.h);
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "700 24px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`Photo ${index + 1}`, placed.x + placed.w / 2, placed.y + placed.h / 2);
+    }
+  });
+  drawDecorations(theme);
+  if (state.showAefeLogo && state.logos.aefe) drawResizableElement("grid-aefe", () => {
+    const rect = sevenPhotoCells()[4];
+    drawLogo(state.logos.aefe, rect.x + 44, rect.y + 60, rect.w - 88, rect.h - 120);
+  });
+  drawResizableElement("grid-card", () => {
+    const rect = sevenPhotoCells()[8];
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    const text = gridCardTextLayout();
+    ctx.font = `900 ${text.size}px system-ui, sans-serif`;
+    ctx.fillStyle = theme.ink;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    text.lines.forEach((line, index) => ctx.fillText(line, rect.x + 24, rect.y + 24 + text.size + index * text.lineHeight));
+  });
+  if (showSelection) drawImageResizeHandle(theme);
 }
 
 function locationProjection() {
@@ -802,7 +889,7 @@ function locationTitleLayout() {
 }
 
 function drawLocationTemplate(theme, showSelection) {
-  drawMarianne(876, 66, 132, 48, "marianne");
+  drawMarianne(26, 14, 132, 48, "marianne");
   drawResizableElement("location-globe", () => {
     const projection = locationProjection();
     const path = d3.geoPath(projection, ctx);
@@ -885,31 +972,59 @@ function drawFormationAction(theme) {
   });
 }
 
+function posterTextLayout() {
+  const paragraphs = (state.title || "Formation des personnels").split(/\r\n|\r|\n/);
+  const metaLines = state.showMeta ? (state.meta || "Date et lieu").split(/\r\n|\r|\n/).flatMap((paragraph) => paragraph.trim() ? getTextLines(paragraph, 30, 620) : [""]) : [];
+  let size = 64;
+  let lines;
+  let lineHeight;
+  ctx.save();
+  do {
+    lines = paragraphs.flatMap((paragraph) => paragraph.trim() ? getTextLines(paragraph, size, 640) : [""]);
+    lineHeight = size * 68 / 64;
+    ctx.font = `900 ${size}px system-ui, sans-serif`;
+    const height = size + (lines.length - 1) * lineHeight + (metaLines.length ? 44 + (metaLines.length - 1) * 36 + 8 : size * 0.25);
+    if (height <= 360 && lines.every((line) => ctx.measureText(line).width <= 640)) break;
+    size -= 1;
+  } while (size > 1);
+  ctx.restore();
+  return { lines, size, lineHeight, metaLines };
+}
+
 function drawPosterTemplate(theme, showSelection = true) {
   drawTopBand(theme);
-  drawMarianne(876, 66, 132, 48, "marianne");
+  drawMarianne(26, 14, 132, 48, "marianne");
 
-  const title = state.title || "Formation des personnels";
-  const titlePoint = offsetPoint(94, 610, "poster-title");
-  wrapText(title, titlePoint.x, titlePoint.y, 640, 64, 68, "#ffffff", "900");
-  const metaY = titlePoint.y + (Math.min(getTextLines(title, 64, 640).length, 4) - 1) * 68 + 44;
-  if (state.showMeta) wrapText(state.meta || "Date et lieu", titlePoint.x + 4, metaY, 620, 30, 36, theme.accent, "900");
   const photo = state.photos[0];
   const posterPhoto = visualCircle(888, 480, 384, "photo-0");
   if (photo) drawCircleImage(photo.image, posterPhoto.cx, posterPhoto.cy, posterPhoto.radius);
   drawDecorations(theme);
 
   drawResizableElement("poster-irf", () => {
-    drawIrfWord(154, 420, 176, theme.accent);
+    drawIrfWord(82, 256, 176, theme.accent);
   });
 
   drawResizableElement("labels-group", () => {
-    drawAngledLabel("L'ENSEIGNEMENT", 146, 190, 214, 38, -11, theme.accent, "#101820");
-    drawAngledLabel("FRANCAIS", 178, 236, 160, 38, -4, "#b7d7ec", "#ffffff");
-    drawAngledLabel("A L'ETRANGER", 196, 276, 190, 38, -7, "#69b69a", "#101820");
+    drawAngledLabel("L'ENSEIGNEMENT", 649, 277, 214, 38, -11, theme.accent, "#101820");
+    drawAngledLabel("FRANCAIS", 681, 323, 160, 38, -4, "#b7d7ec", "#ffffff");
+    drawAngledLabel("A L'ETRANGER", 699, 363, 190, 38, -7, "#69b69a", "#101820");
   });
 
-  drawLogoCluster(818, 984, theme, "logo-cluster");
+  const titlePoint = offsetPoint(90, 484, "poster-title");
+  const text = posterTextLayout();
+  ctx.save();
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
+  ctx.font = `900 ${text.size}px system-ui, sans-serif`;
+  ctx.fillStyle = "#ffffff";
+  text.lines.forEach((line, index) => ctx.fillText(line, titlePoint.x, titlePoint.y + text.size + index * text.lineHeight));
+  const metaY = titlePoint.y + text.size + (text.lines.length - 1) * text.lineHeight + 44;
+  ctx.font = "900 30px system-ui, sans-serif";
+  ctx.fillStyle = theme.accent;
+  text.metaLines.forEach((line, index) => ctx.fillText(line, titlePoint.x + 4, metaY + index * 36));
+  ctx.restore();
+
+  drawLogoCluster(920.4, 984, theme, "logo-cluster");
   drawFormationAction(theme);
   if (showSelection) drawImageResizeHandle(theme);
 }
@@ -929,7 +1044,7 @@ function drawCircleTemplate(theme, showSelection = true) {
   });
 
   drawTopBand(theme);
-  drawMarianne(876, 66, 132, 48, "marianne");
+  drawMarianne(26, 14, 132, 48, "marianne");
   drawLogoCluster(24, 984, theme, "logo-cluster");
   drawDecorations(theme);
   if (showSelection) drawImageResizeHandle(theme);
@@ -944,7 +1059,7 @@ function drawBackgroundMarks(theme) {
   ctx.textAlign = "left";
   ctx.strokeText("IRF", -18, 350);
   ctx.font = "900 italic 360px Arial Black, Impact, system-ui, sans-serif";
-  ctx.strokeText("ZAP", 122, 1068);
+  ctx.strokeText("ZAP", 122, 1028);
   ctx.globalAlpha = 1;
   drawTopBand(theme);
   ctx.restore();
@@ -1008,7 +1123,7 @@ function drawFooter(theme, elementId) {
     drawLogo(state.logos.aefeOriginal || state.logos.aefe, 677 + offset.x, 926.4 + offset.y, 136, 83.2);
   }
   if (state.showZoneLogo && state.logos.zone) {
-    drawLogo(state.logos.zone, 840 + offset.x, 934 + offset.y, 130, 68);
+    drawLogo(state.logos.zone, 827 + offset.x, 927.2 + offset.y, 156, 81.6);
   }
 }
 
@@ -1231,7 +1346,7 @@ function currentTemplateElements() {
   if (state.showConfetti) state.confettiGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 300, 278, true)));
   if (state.showPoints) state.pointGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 300, 300, true)));
   if (state.showChevrons) state.chevronGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 225, 225, true)));
-  if (state.showRucheLogo) items.push(rectElement("ruche-logo", 890, 140, 112, 126, true));
+  if (state.showRucheLogo) items.push(rectElement("ruche-logo", 936, 5, 112, 126, true));
   return items.map((item) => {
     const transformed = applyElementTransform(item);
     if (item.id === "location-title") {
@@ -1251,11 +1366,19 @@ function currentTemplateElements() {
 
 function rawTemplateElements() {
   const template = currentTemplate();
+  if (template.kind === "grid-seven") {
+    const cells = sevenPhotoCells();
+    return [
+      ...sevenPhotoRects().map((rect, index) => rectElement(`photo-${index}`, rect.x, rect.y, rect.w, rect.h, true)),
+      ...(state.showAefeLogo ? [rectElement("grid-aefe", cells[4].x, cells[4].y, cells[4].w, cells[4].h, true)] : []),
+      rectElement("grid-card", cells[8].x, cells[8].y, cells[8].w, cells[8].h, true),
+    ];
+  }
   if (template.kind === "location") {
     const label = locationLabelLayout();
     const actions = formationActionLayout();
     return [
-      rectElement("marianne", 876, 66, 132, 48),
+      marianneElement(26, 14),
       rectElement("location-globe", 622.5, 182.5, 675, 675, true),
       ...(label.lines.length ? [rectElement("location-label", label.x, label.y, label.w, label.h, true)] : []),
       rectElement("location-title", 70, 132, 940, 170, true),
@@ -1266,18 +1389,18 @@ function rawTemplateElements() {
   if (template.kind === "poster") {
     const actions = formationActionLayout();
     return [
-      rectElement("marianne", 876, 66, 132, 48),
-      rectElement("poster-title", 94, 548, 640, 280),
+      marianneElement(26, 14),
+      rectElement("poster-title", 90, 484, 640, 360),
       circleElement("photo-0", 888, 480, 384, true),
-      rectElement("poster-irf", 154, 272, 360, 170, true),
-      rectElement("labels-group", 132, 172, 282, 150, true),
-      rectElement("logo-cluster", 818, 972, 238, 82),
+      rectElement("poster-irf", 82, 108, 360, 170, true),
+      rectElement("labels-group", 635, 259, 282, 150, true),
+      rectElement("logo-cluster", 908.8, 977.4, 139.2, 79.2),
       ...(actions.lines.length ? [rectElement("formation-actions", actions.x, actions.y, actions.w, actions.h)] : []),
     ];
   }
   if (template.kind === "circles") {
     const items = [
-      rectElement("marianne", 876, 66, 132, 48),
+      marianneElement(26, 14),
       circleElement("photo-0", 192, 238, 346, true),
       circleElement("photo-1", 792, 828, 370, true),
       rectElement("logo-cluster", 24, 972, 238, 82),
@@ -1289,7 +1412,7 @@ function rawTemplateElements() {
   }
 
   const rects = template.layout(Math.max(photoCount(), 1)).map((rect, index) => rectElement(`photo-${index}`, rect.x, rect.y, rect.w, rect.h, true));
-  if (template.id === "feature") rects.push(rectElement("marianne", isMosaicLayout() ? 64 : 59, 66, 132, 48));
+  if (template.id === "feature") rects.push(marianneElement(26, 14));
   rects.push(rectElement("footer", 70, 900, 940, isMosaicLayout() ? 130 : 140));
   return rects;
 }
@@ -1377,7 +1500,7 @@ function baseElement(elementId) {
   if (points) return rectElement(points.id, points.x, points.y, 300, 300, true);
   const confetti = state.confettiGroups.find((group) => group.id === elementId);
   if (confetti) return rectElement(confetti.id, confetti.x, confetti.y, 300, 278, true);
-  if (elementId === "ruche-logo") return rectElement("ruche-logo", 890, 140, 112, 126, true);
+  if (elementId === "ruche-logo") return rectElement("ruche-logo", 936, 5, 112, 126, true);
   return rawTemplateElements()
     .find((item) => item.id === elementId);
 }
@@ -1456,14 +1579,14 @@ function drawRucheLogo() {
   ctx.save();
   ctx.translate(rect.x, rect.y);
   ctx.scale(rect.w / 558, rect.h / 628);
-  // Clip the original artwork to its hexagon, keeping the logo intact.
+  // Inset the clip to exclude the yellow fringe around the source hexagon.
   ctx.beginPath();
-  ctx.moveTo(277, 0);
-  ctx.lineTo(555, 143);
-  ctx.lineTo(558, 482);
-  ctx.lineTo(280, 628);
-  ctx.lineTo(3, 487);
-  ctx.lineTo(0, 146);
+  ctx.moveTo(277, 6);
+  ctx.lineTo(549, 147);
+  ctx.lineTo(552, 478);
+  ctx.lineTo(280, 622);
+  ctx.lineTo(9, 483);
+  ctx.lineTo(6, 150);
   ctx.closePath();
   ctx.clip();
   ctx.drawImage(state.logos.ruche, 408, 214, 558, 628, 0, 0, 558, 628);
@@ -1494,13 +1617,39 @@ function drawDecorations(theme) {
 function drawLogoCluster(x, y, theme, elementId) {
   const point = offsetPoint(x, y, elementId);
   if (["poster", "location", "circles"].includes(currentTemplate().id)) {
-    if (state.showZoneLogo && state.logos.zone) drawLogo(state.logos.zone, point.x, point.y, 116, 66);
-    if (state.showAefeLogo && state.logos.aefe) drawLogo(state.logos.aefe, point.x + 138, point.y - 12, 100, 82);
+    if (state.showZoneLogo && state.logos.zone) drawLogo(state.logos.zone, point.x - 11.6, point.y - 6.6, 139.2, 79.2);
+    if (currentTemplate().id !== "poster" && state.showAefeLogo && state.logos.aefe) drawLogo(state.logos.aefe, point.x + 138, point.y - 12, 100, 82);
     return;
   }
   const aefeOffset = ["poster", "location", "circles"].includes(currentTemplate().id) ? 110 : 140;
-  if (state.showZoneLogo && state.logos.zone) drawLogo(state.logos.zone, point.x, point.y, 116, 66);
+  if (state.showZoneLogo && state.logos.zone) drawLogo(state.logos.zone, point.x - 11.6, point.y - 6.6, 139.2, 79.2);
   if (state.showAefeLogo && state.logos.aefe) drawLogo(state.logos.aefe, point.x + aefeOffset, point.y - 14, 154, 100);
+}
+
+function transparentDevise(image) {
+  const result = document.createElement("canvas");
+  result.width = image.width;
+  result.height = image.height;
+  const context = result.getContext("2d");
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, result.width, result.height);
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const brightness = Math.min(pixels.data[index], pixels.data[index + 1], pixels.data[index + 2]);
+    pixels.data[index + 3] = Math.round(pixels.data[index + 3] * (1 - brightness / 255));
+    pixels.data[index] = pixels.data[index + 1] = pixels.data[index + 2] = 0;
+  }
+  context.putImageData(pixels, 0, 0);
+  return result;
+}
+
+function marianneDeviseX(x) {
+  return x + 243 > 1080 ? x - 111 : x + 146;
+}
+
+function marianneElement(x, y) {
+  const left = Math.min(x - 5, marianneDeviseX(x));
+  const right = Math.max(x + 137, marianneDeviseX(x) + 97);
+  return rectElement("marianne", left, y - 5, right - left, 62);
 }
 
 function drawMarianne(x, y, w, h, elementId) {
@@ -1512,6 +1661,10 @@ function drawMarianne(x, y, w, h, elementId) {
   roundedRect(point.x - 5, point.y - 5, w + 10, h + 10, 4);
   ctx.fill();
   drawLogo(state.logos.marianne, point.x, point.y, w, h);
+  if (state.logos.devise) {
+    const deviseX = marianneDeviseX(x) + (point.x - x);
+    drawLogo(state.logos.devise, deviseX, point.y - 5, 97, 62);
+  }
   ctx.restore();
 }
 

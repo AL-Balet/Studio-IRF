@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Studio IRF</title>
-    <link rel="stylesheet" href="styles.css?v=20261009-104" />
+    <link rel="stylesheet" href="styles.css?v=20261020-134" />
   </head>
   <body>
     <main class="app-shell">
@@ -29,11 +29,11 @@
         <section class="panel-section">
           <div class="section-heading">
             <h2>Photos</h2>
-            <span id="photoCount">0/5</span>
+            <span id="photoCount">0/7</span>
           </div>
           <label class="upload-zone" for="photoInput">
             <input id="photoInput" type="file" accept="image/*" multiple />
-            <span>Ajouter jusqu'a 5 photographies</span>
+            <span>Ajouter jusqu'à 7 photographies</span>
           </label>
           <div id="photoList" class="photo-list" aria-live="polite"></div>
           <div class="blur-controls">
@@ -126,6 +126,10 @@
             Fond de texte
           </label>
           <div id="freeTextList" class="free-text-list" aria-live="polite"></div>
+          <label id="gridTextControls" hidden>
+            Texte du rectangle
+            <textarea id="gridTextInput" maxlength="500" rows="5">Votre texte</textarea>
+          </label>
         </section>
 
         <section class="panel-section">
@@ -157,7 +161,7 @@
               Marianne
             </label>
             <label class="check-row">
-              <input id="rucheLogoToggle" type="checkbox" />
+              <input id="rucheLogoToggle" type="checkbox" checked />
               La Ruche
             </label>
           </div>
@@ -198,6 +202,6 @@
 
     <script src="assets/d3.min.js"></script>
     <script src="assets/world-land.js"></script>
-    <script src="app.js?v=20261009-121"></script>
+    <script src="app.js?v=20261020-137"></script>
   </body>
 </html>
