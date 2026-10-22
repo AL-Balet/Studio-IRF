@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Studio IRF</title>
-    <link rel="stylesheet" href="styles.css?v=20261020-134" />
+    <link rel="stylesheet" href="styles.css?v=20261022-151" />
   </head>
   <body>
     <main class="app-shell">
@@ -147,6 +147,12 @@
           </div>
           <div class="identity-group" role="group" aria-labelledby="logosHeading">
             <h3 id="logosHeading">Logos</h3>
+            <label id="gridLogoControls" hidden>Logo au centre
+              <select id="gridCenterLogo">
+                <option value="aefe">AEFE</option>
+                <option value="zone" selected>Zone Asie-Pacifique</option>
+              </select>
+            </label>
           <div class="identity-options">
             <label class="check-row">
               <input id="aefeLogoToggle" type="checkbox" checked />
@@ -194,14 +200,25 @@
           <div class="section-heading">
             <h2>Sortie</h2>
           </div>
-          <p class="output-note">Image carree Instagram prete a publier : PNG, 1080 x 1080 px.</p>
+          <p class="output-note">Image carrée prête à publier. PNG, 1080 x 1080 px.</p>
           <button class="primary-action full-width" id="downloadButtonPanel" type="button"><img class="download-icon" src="assets/download.svg" alt="" aria-hidden="true" />Télécharger le visuel</button>
         </section>
       </aside>
     </main>
+    <footer class="site-footer">
+      Application web conçue par <a href="https://github.com/AL-Balet/Studio-IRF" target="_blank" rel="noopener noreferrer">Alexandre Balet</a> pour l'Institut Régional de Formation de la Zone Asie Pacifique de l'AEFE. 2026.
+      <div class="license-note">
+        <span>Ce travail est placé sous licence <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.fr" rel="license noopener noreferrer" target="_blank"><strong>Creative Commons CC BY-SA</strong></a>.</span>
+        <div class="license-icons" aria-label="Licence Creative Commons CC BY-SA 4.0">
+          <a class="license-badge" href="https://creativecommons.org/licenses/by-sa/4.0/deed.fr" rel="license noopener noreferrer" target="_blank" aria-label="Creative Commons" title="Creative Commons">CC</a>
+          <a class="license-badge" href="https://creativecommons.org/licenses/by-sa/4.0/deed.fr" rel="license noopener noreferrer" target="_blank" aria-label="Attribution" title="Attribution">BY</a>
+          <a class="license-badge" href="https://creativecommons.org/licenses/by-sa/4.0/deed.fr" rel="license noopener noreferrer" target="_blank" aria-label="Partage dans les mêmes conditions" title="Partage dans les mêmes conditions">SA</a>
+        </div>
+      </div>
+    </footer>
 
     <script src="assets/d3.min.js"></script>
     <script src="assets/world-land.js"></script>
-    <script src="app.js?v=20261020-137"></script>
+    <script src="app.js?v=20261022-146"></script>
   </body>
 </html>

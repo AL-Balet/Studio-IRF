@@ -1,11 +1,13 @@
 const canvas = document.querySelector("#posterCanvas");
 const ctx = canvas.getContext("2d");
 const logoMaskCache = new WeakMap();
+const zoneGridColorCache = new WeakMap();
 const ASSET_VERSION = "20261007-73";
 
 const state = {
   photos: [],
   gridText: "Votre texte",
+  gridCenterLogo: "zone",
   blurMode: false,
   blurPointer: null,
   blurHistory: [],
@@ -43,6 +45,7 @@ const state = {
     aefe: null,
     aefeOriginal: null,
     zone: null,
+    zoneGrid: null,
     marianne: null,
     devise: null,
     ruche: null,
@@ -195,7 +198,7 @@ const elements = {
 };
 
 async function init() {
-  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons, devise] = await Promise.all([
+  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons, devise, zoneGrid] = await Promise.all([
     loadImage(assetUrl("assets/aefe-logo-blanc.png")),
     loadImage(assetUrl("assets/irf-aefe-asie-pacifique.png")),
     loadImage(assetUrl("assets/marianne.png")),
@@ -205,6 +208,7 @@ async function init() {
     loadImage(assetUrl("assets/points.png")),
     loadImage(assetUrl("assets/chevrons.png")),
     loadImage(assetUrl("assets/republique-francaise-devise.png")),
+    loadImage(assetUrl("assets/zone-asie-pacifique-transparent.png")),
   ]);
   state.logos.aefe = aefe;
   state.logos.aefeOriginal = aefeOriginal;
@@ -212,6 +216,7 @@ async function init() {
   state.logos.points = points;
   state.logos.chevrons = chevrons;
   state.logos.zone = zone;
+  state.logos.zoneGrid = zoneGrid;
   state.logos.marianne = marianne;
   state.logos.devise = transparentDevise(devise);
   state.logos.ruche = ruche;
@@ -222,6 +227,10 @@ async function init() {
 }
 
 function bindEvents() {
+  document.querySelector("#gridCenterLogo").addEventListener("change", (event) => {
+    state.gridCenterLogo = event.target.value;
+    draw();
+  });
   document.querySelector("#gridTextInput").addEventListener("input", (event) => {
     state.gridText = event.target.value;
     draw();
@@ -563,6 +572,7 @@ function updateTemplateCards() {
   const current = currentTemplate();
   elements.locationSection.hidden = current.kind !== "location";
   document.querySelector("#gridTextControls").hidden = current.kind !== "grid-seven";
+  document.querySelector("#gridLogoControls").hidden = current.kind !== "grid-seven";
   document.querySelector("#actionSection").hidden = !["location", "poster"].includes(current.kind);
   document.querySelectorAll(".template-card").forEach((button) => {
     const template = templates.find((item) => item.id === button.dataset.template);
@@ -744,6 +754,42 @@ function gridCardTextLayout() {
   return { lines, size, lineHeight: size * 1.2 };
 }
 
+function themedZoneGridLogo(image, color) {
+  if (!image) return null;
+  let variants = zoneGridColorCache.get(image);
+  if (!variants) {
+    variants = new Map();
+    zoneGridColorCache.set(image, variants);
+  }
+  if (variants.has(color)) return variants.get(color);
+  const result = document.createElement("canvas");
+  result.width = image.width;
+  result.height = image.height;
+  const context = result.getContext("2d");
+  context.drawImage(image, 0, 0);
+  const pixels = context.getImageData(0, 0, result.width, result.height);
+  const [red, green, blue] = hexToRgb(color);
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const [r, g, b] = pixels.data.subarray(index, index + 3);
+    if (r > g + 10 && b > g + 8) {
+      pixels.data[index] = red;
+      pixels.data[index + 1] = green;
+      pixels.data[index + 2] = blue;
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  variants.set(color, result);
+  return result;
+}
+
+function gridCenterLogoImage() {
+  const theme = themes[state.theme];
+  const color = ["ink", "coral"].includes(state.theme) ? theme.accent2 : theme.accent;
+  return state.gridCenterLogo === "zone"
+    ? (state.showZoneLogo ? themedZoneGridLogo(state.logos.zoneGrid, color) : null)
+    : (state.showAefeLogo ? state.logos.aefe : null);
+}
+
 function drawSevenPhotoGrid(theme, showSelection) {
   sevenPhotoRects().forEach((rect, index) => {
     const placed = visualRect(rect, `photo-${index}`);
@@ -759,9 +805,14 @@ function drawSevenPhotoGrid(theme, showSelection) {
     }
   });
   drawDecorations(theme);
-  if (state.showAefeLogo && state.logos.aefe) drawResizableElement("grid-aefe", () => {
+  const centerLogo = gridCenterLogoImage();
+  if (centerLogo) drawResizableElement("grid-center-logo", () => {
     const rect = sevenPhotoCells()[4];
-    drawLogo(state.logos.aefe, rect.x + 44, rect.y + 60, rect.w - 88, rect.h - 120);
+    if (state.gridCenterLogo === "zone") {
+      drawLogo(centerLogo, rect.x - 14, rect.y + 35, rect.w + 28, rect.h - 70);
+    } else {
+      drawLogo(centerLogo, rect.x + 44, rect.y + 60, rect.w - 88, rect.h - 120);
+    }
   });
   drawResizableElement("grid-card", () => {
     const rect = sevenPhotoCells()[8];
@@ -1045,7 +1096,7 @@ function drawCircleTemplate(theme, showSelection = true) {
 
   drawTopBand(theme);
   drawMarianne(26, 14, 132, 48, "marianne");
-  drawLogoCluster(24, 984, theme, "logo-cluster");
+  drawLogoCluster(44, 984, theme, "logo-cluster");
   drawDecorations(theme);
   if (showSelection) drawImageResizeHandle(theme);
 }
@@ -1120,10 +1171,10 @@ function drawFooter(theme, elementId) {
   if (state.showMeta) fitText(state.meta || "Date et lieu", 108 + offset.x, metaY, 560, 23, theme.muted);
 
   if (state.showAefeLogo && state.logos.aefe) {
-    drawLogo(state.logos.aefeOriginal || state.logos.aefe, 677 + offset.x, 926.4 + offset.y, 136, 83.2);
+    drawPlacedAefe(state.logos.aefeOriginal || state.logos.aefe);
   }
   if (state.showZoneLogo && state.logos.zone) {
-    drawLogo(state.logos.zone, 827 + offset.x, 927.2 + offset.y, 156, 81.6);
+    drawPlacedZone();
   }
 }
 
@@ -1343,6 +1394,10 @@ function resizeHandleRect(item) {
 
 function currentTemplateElements() {
   const items = rawTemplateElements();
+  const aefe = aefeLogoElement();
+  if (aefe) items.push(aefe);
+  const zone = zoneLogoElement();
+  if (zone) items.push(zone);
   if (state.showConfetti) state.confettiGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 300, 278, true)));
   if (state.showPoints) state.pointGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 300, 300, true)));
   if (state.showChevrons) state.chevronGroups.forEach((group) => items.push(rectElement(group.id, group.x, group.y, 225, 225, true)));
@@ -1370,7 +1425,7 @@ function rawTemplateElements() {
     const cells = sevenPhotoCells();
     return [
       ...sevenPhotoRects().map((rect, index) => rectElement(`photo-${index}`, rect.x, rect.y, rect.w, rect.h, true)),
-      ...(state.showAefeLogo ? [rectElement("grid-aefe", cells[4].x, cells[4].y, cells[4].w, cells[4].h, true)] : []),
+      ...(gridCenterLogoImage() ? [rectElement("grid-center-logo", cells[4].x, cells[4].y, cells[4].w, cells[4].h, true)] : []),
       rectElement("grid-card", cells[8].x, cells[8].y, cells[8].w, cells[8].h, true),
     ];
   }
@@ -1403,7 +1458,7 @@ function rawTemplateElements() {
       marianneElement(26, 14),
       circleElement("photo-0", 192, 238, 346, true),
       circleElement("photo-1", 792, 828, 370, true),
-      rectElement("logo-cluster", 24, 972, 238, 82),
+      rectElement("logo-cluster", 44, 972, 238, 82),
     ];
     state.photos.slice(2, 5).forEach((photo, index) => {
       items.push(circleElement(`photo-${index + 2}`, 212 + index * 130, 780 + (index % 2) * 70, 80, true));
@@ -1476,7 +1531,7 @@ function getElementOffset(elementId) {
 
 function getElementScale(elementId) {
   if (!elementId) return 1;
-  return state.elementScales[elementOffsetKey(elementId)] || (elementId === "location-globe" ? 1.1 : 1);
+  return state.elementScales[elementOffsetKey(elementId)] || (["location-globe", "zone-logo"].includes(elementId) ? 1.1 : 1);
 }
 
 function setElementScale(elementId, scale) {
@@ -1494,6 +1549,8 @@ function setElementPosition(elementId, x, y) {
 }
 
 function baseElement(elementId) {
+  if (elementId === "zone-logo") return zoneLogoElement();
+  if (elementId === "aefe-logo") return aefeLogoElement();
   const chevrons = state.chevronGroups.find((group) => group.id === elementId);
   if (chevrons) return rectElement(chevrons.id, chevrons.x, chevrons.y, 225, 225, true);
   const points = state.pointGroups.find((group) => group.id === elementId);
@@ -1614,15 +1671,54 @@ function drawDecorations(theme) {
   ctx.restore();
 }
 
+function zoneLogoElement() {
+  if (!state.showZoneLogo || !state.logos.zone) return null;
+  const id = currentTemplate().id;
+  if (id === "feature") {
+    const offset = getElementOffset("footer");
+    return rectElement("zone-logo", 827 + offset.x, 927.2 + offset.y, 156, 81.6, true);
+  }
+  const left = { poster: 908.8, location: 806.4, circles: 32.4 }[id];
+  if (left === undefined) return null;
+  const offset = getElementOffset("logo-cluster");
+  return rectElement("zone-logo", left + offset.x, 977.4 + offset.y, 139.2, 79.2, true);
+}
+
+function drawPlacedZone() {
+  const base = zoneLogoElement();
+  if (!base) return;
+  drawResizableElement("zone-logo", () => drawLogo(state.logos.zone, base.x, base.y, base.w, base.h));
+}
+
+function aefeLogoElement() {
+  if (!state.showAefeLogo || !state.logos.aefe) return null;
+  const id = currentTemplate().id;
+  if (id === "feature") {
+    const offset = getElementOffset("footer");
+    return rectElement("aefe-logo", 677 + offset.x, 926.4 + offset.y, 136, 83.2, true);
+  }
+  if (id === "location" || id === "circles") {
+    const offset = getElementOffset("logo-cluster");
+    return rectElement("aefe-logo", (id === "location" ? 956 : 182) + offset.x, 972 + offset.y, 100, 82, true);
+  }
+  return null;
+}
+
+function drawPlacedAefe(image) {
+  const base = aefeLogoElement();
+  if (!base) return;
+  drawResizableElement("aefe-logo", () => drawLogo(image, base.x, base.y, base.w, base.h));
+}
+
 function drawLogoCluster(x, y, theme, elementId) {
   const point = offsetPoint(x, y, elementId);
   if (["poster", "location", "circles"].includes(currentTemplate().id)) {
-    if (state.showZoneLogo && state.logos.zone) drawLogo(state.logos.zone, point.x - 11.6, point.y - 6.6, 139.2, 79.2);
-    if (currentTemplate().id !== "poster" && state.showAefeLogo && state.logos.aefe) drawLogo(state.logos.aefe, point.x + 138, point.y - 12, 100, 82);
+    if (state.showZoneLogo && state.logos.zone) drawPlacedZone();
+    if (currentTemplate().id !== "poster" && state.showAefeLogo && state.logos.aefe) drawPlacedAefe(state.logos.aefe);
     return;
   }
   const aefeOffset = ["poster", "location", "circles"].includes(currentTemplate().id) ? 110 : 140;
-  if (state.showZoneLogo && state.logos.zone) drawLogo(state.logos.zone, point.x - 11.6, point.y - 6.6, 139.2, 79.2);
+  if (state.showZoneLogo && state.logos.zone) drawPlacedZone();
   if (state.showAefeLogo && state.logos.aefe) drawLogo(state.logos.aefe, point.x + aefeOffset, point.y - 14, 154, 100);
 }
 
