@@ -2,6 +2,7 @@ const canvas = document.querySelector("#posterCanvas");
 const ctx = canvas.getContext("2d");
 const logoMaskCache = new WeakMap();
 const zoneGridColorCache = new WeakMap();
+let locationProjectionCache = null;
 const ASSET_VERSION = "20261007-73";
 
 const state = {
@@ -30,6 +31,8 @@ const state = {
   chevronGroups: [],
   nextChevronsId: 0,
   location: { label: "Bangkok, Thaïlande", latitude: 13.7563, longitude: 100.5018 },
+  multipleCities: false,
+  secondLocation: { label: "Canberra, Australie", latitude: -35.2809, longitude: 149.13 },
   locationLabelColor: "#283178",
   locationActions: { establishment: false, zone: false, seminar: false },
   textBlocks: [],
@@ -163,12 +166,14 @@ const trainingCities = [
   ["Manille, Philippines", 14.5995, 120.9842],
   ["Sydney, Australie", -33.8688, 151.2093],
   ["Melbourne, Australie", -37.8136, 144.9631],
+  ["Canberra, Australie", -35.2809, 149.13],
+  ["Adélaïde, Australie", -34.9285, 138.6007],
   ["Wellington, Nouvelle-Zélande", -41.2866, 174.7756],
   ["Auckland, Nouvelle-Zélande", -36.8485, 174.7633],
   ["Nouméa, Nouvelle-Calédonie", -22.2758, 166.458],
   ["Papeete, Polynésie française", -17.5516, -149.5585],
   ["Port-Vila, Vanuatu", -17.7333, 168.3273],
-];
+].sort(([first], [second]) => first.localeCompare(second, "fr", { sensitivity: "base" }));
 
 const elements = {
   photoInput: document.querySelector("#photoInput"),
@@ -198,7 +203,14 @@ const elements = {
 };
 
 async function init() {
-  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons, devise, zoneGrid] = await Promise.all([
+  elements.locationCity.innerHTML = trainingCities.map(([label], index) => `<option value="${index}">${escapeHtml(label)}</option>`).join("");
+  elements.locationCity.value = String(trainingCities.findIndex(([label]) => label === state.location.label));
+  document.querySelector("#secondLocationCity").innerHTML = elements.locationCity.innerHTML;
+  document.querySelector("#secondLocationCity").value = String(trainingCities.findIndex(([label]) => label === state.secondLocation.label));
+  renderTemplatePicker();
+  bindEvents();
+  update();
+  const results = await Promise.allSettled([
     loadImage(assetUrl("assets/aefe-logo-blanc.png")),
     loadImage(assetUrl("assets/irf-aefe-asie-pacifique.png")),
     loadImage(assetUrl("assets/marianne.png")),
@@ -210,6 +222,8 @@ async function init() {
     loadImage(assetUrl("assets/republique-francaise-devise.png")),
     loadImage(assetUrl("assets/zone-asie-pacifique-transparent.png")),
   ]);
+  const [aefe, zone, marianne, ruche, aefeOriginal, confetti, points, chevrons, devise, zoneGrid] = results.map((result) => result.status === "fulfilled" ? result.value : null);
+  results.filter((result) => result.status === "rejected").forEach((result) => console.warn("Logo indisponible :", result.reason));
   state.logos.aefe = aefe;
   state.logos.aefeOriginal = aefeOriginal;
   state.logos.confetti = confetti;
@@ -220,13 +234,28 @@ async function init() {
   state.logos.marianne = marianne;
   state.logos.devise = transparentDevise(devise);
   state.logos.ruche = ruche;
-  elements.locationCity.innerHTML = trainingCities.map(([label], index) => `<option value="${index}">${escapeHtml(label)}</option>`).join("");
-  renderTemplatePicker();
-  bindEvents();
   draw();
 }
 
 function bindEvents() {
+  document.querySelector("#multipleCities").addEventListener("change", (event) => {
+    state.multipleCities = event.target.checked;
+    document.querySelector("#secondCityControls").hidden = !state.multipleCities;
+    if (!state.multipleCities && state.selectedElementId === "location-label-2") state.selectedElementId = null;
+    draw();
+  });
+  document.querySelector("#secondLocationCity").addEventListener("change", (event) => {
+    const city = trainingCities[event.target.value];
+    if (!city) return;
+    const [label, latitude, longitude] = city;
+    state.secondLocation = { label, latitude, longitude };
+    document.querySelector("#secondLocationLabel").value = label;
+    draw();
+  });
+  document.querySelector("#secondLocationLabel").addEventListener("input", (event) => {
+    state.secondLocation.label = event.target.value;
+    draw();
+  });
   document.querySelector("#gridCenterLogo").addEventListener("change", (event) => {
     state.gridCenterLogo = event.target.value;
     draw();
@@ -767,7 +796,14 @@ function themedZoneGridLogo(image, color) {
   result.height = image.height;
   const context = result.getContext("2d");
   context.drawImage(image, 0, 0);
-  const pixels = context.getImageData(0, 0, result.width, result.height);
+  let pixels;
+  try {
+    pixels = context.getImageData(0, 0, result.width, result.height);
+  } catch (error) {
+    console.warn("Colorisation du logo indisponible :", error);
+    variants.set(color, image);
+    return image;
+  }
   const [red, green, blue] = hexToRgb(color);
   for (let index = 0; index < pixels.data.length; index += 4) {
     const [r, g, b] = pixels.data.subarray(index, index + 3);
@@ -783,10 +819,8 @@ function themedZoneGridLogo(image, color) {
 }
 
 function gridCenterLogoImage() {
-  const theme = themes[state.theme];
-  const color = ["ink", "coral"].includes(state.theme) ? theme.accent2 : theme.accent;
   return state.gridCenterLogo === "zone"
-    ? (state.showZoneLogo ? themedZoneGridLogo(state.logos.zoneGrid, color) : null)
+    ? (state.showZoneLogo ? state.logos.zone : null)
     : (state.showAefeLogo ? state.logos.aefe : null);
 }
 
@@ -809,7 +843,9 @@ function drawSevenPhotoGrid(theme, showSelection) {
   if (centerLogo) drawResizableElement("grid-center-logo", () => {
     const rect = sevenPhotoCells()[4];
     if (state.gridCenterLogo === "zone") {
-      drawLogo(centerLogo, rect.x - 14, rect.y + 35, rect.w + 28, rect.h - 70);
+      const width = (rect.w + 28) * 0.8;
+      const height = (rect.h - 70) * 0.8;
+      drawLogo(centerLogo, rect.x + (rect.w - width) / 2, rect.y + (rect.h - height) / 2, width, height);
     } else {
       drawLogo(centerLogo, rect.x + 44, rect.y + 60, rect.w - 88, rect.h - 120);
     }
@@ -828,26 +864,54 @@ function drawSevenPhotoGrid(theme, showSelection) {
   if (showSelection) drawImageResizeHandle(theme);
 }
 
+function activeLocations() {
+  return state.multipleCities ? [state.location, state.secondLocation] : [state.location];
+}
+
 function locationProjection() {
+  const key = JSON.stringify(activeLocations().map(({ longitude, latitude }) => [longitude, latitude]));
+  if (locationProjectionCache?.key === key) return locationProjectionCache.projection;
   const coordinates = [state.location.longitude, state.location.latitude];
   const center = d3.geoDistance([135, 15], coordinates) < Math.PI / 2 - 0.12 ? [135, 15] : coordinates;
   const projection = d3.geoOrthographic().rotate([-center[0], -center[1]]).scale(315).translate([960, 520]).clipAngle(90);
   if (projection(coordinates)[0] > 1040) projection.rotate([-coordinates[0], -coordinates[1]]);
+  if (state.multipleCities) {
+    const points = activeLocations().map(({ longitude, latitude }) => [longitude, latitude]);
+    const midpoint = d3.geoInterpolate(points[0], points[1])(0.5);
+    let best = null;
+    for (const latitude of [midpoint[1], 15, 0]) {
+      for (let shift = 0; shift <= 90; shift += 5) {
+        const center = [midpoint[0] + shift, latitude];
+        for (const roll of [0, 45, -45, 90, -90]) {
+          const rotation = [-center[0], -center[1], roll];
+          projection.rotate(rotation);
+          const score = points.reduce((total, point) => {
+            const [x, y] = projection(point);
+            const hidden = Math.max(0, d3.geoDistance(center, point) - Math.PI / 2 + 0.03);
+            return total + hidden * 100000 + Math.max(0, x - 1020, 650 - x) ** 2 + Math.max(0, y - 835, 205 - y) ** 2;
+          }, 0) + d3.geoDistance([135, 15], center) + Math.abs(roll) * 0.1;
+          if (!best || score < best.score) best = { rotation, score };
+        }
+      }
+    }
+    projection.rotate(best.rotation);
+  }
+  locationProjectionCache = { key, projection };
   return projection;
 }
 
-function locationLabelLayout() {
-  const [pointX, pointY] = locationProjection()([state.location.longitude, state.location.latitude]);
+function locationLabelLayout(location = state.location, index = 0) {
+  const [pointX, pointY] = locationProjection()([location.longitude, location.latitude]);
   const left = pointX > 850;
   const width = Math.min(300, left ? pointX - 24 - 642.5 : 1060 - pointX - 24);
-  const text = state.location.label.trim();
+  const text = location.label.trim();
   const lines = text ? getTextLines(text, 26, width) : [];
   const height = lines.length * 30;
   const x = left ? pointX - 24 - width : pointX + 24;
   const y = clamp(pointY - height / 2, 202.5, 837.5 - height);
   const globe = applyElementTransform(rectElement("location-globe", 622.5, 182.5, 675, 675, true));
   const scale = globe.w / 675;
-  return {
+  const layout = {
     x: globe.x + (x - 622.5) * scale,
     y: globe.y + (y - 182.5) * scale,
     w: width * scale,
@@ -857,6 +921,14 @@ function locationLabelLayout() {
     lines,
     left,
   };
+  if (index === 1 && layout.lines.length) {
+    const first = locationLabelLayout();
+    if (first.lines.length && layout.x < first.x + first.w && layout.x + layout.w > first.x && layout.y < first.y + first.h + 12 && layout.y + layout.h + 12 > first.y) {
+      layout.y = first.y + first.h + 16;
+      if (layout.y + layout.h > globe.y + globe.h - 20) layout.y = first.y - layout.h - 16;
+    }
+  }
+  return layout;
 }
 
 function formationActionLayout() {
@@ -959,39 +1031,51 @@ function drawLocationTemplate(theme, showSelection) {
     ctx.strokeStyle = "rgba(83,103,159,0.25)";
     ctx.lineWidth = 1;
     ctx.stroke();
-    const marker = { type: "Point", coordinates: [state.location.longitude, state.location.latitude] };
-    ctx.beginPath();
-    path.pointRadius(14)(marker);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.beginPath();
-    path.pointRadius(9)(marker);
-    ctx.fillStyle = state.locationLabelColor;
-    ctx.fill();
-    ctx.strokeStyle = theme.ink;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    activeLocations().forEach((location) => {
+      const marker = { type: "Point", coordinates: [location.longitude, location.latitude] };
+      ctx.beginPath();
+      path.pointRadius(14)(marker);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.beginPath();
+      path.pointRadius(9)(marker);
+      ctx.fillStyle = state.locationLabelColor;
+      ctx.fill();
+      ctx.strokeStyle = theme.ink;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
     ctx.restore();
   });
-  const label = locationLabelLayout();
   drawDecorations(theme);
-  if (label.lines.length) drawResizableElement("location-label", () => {
-    ctx.textAlign = label.left ? "right" : "left";
-    ctx.textBaseline = "middle";
-    ctx.font = `900 ${label.size}px system-ui, sans-serif`;
-    label.lines.forEach((line, index) => {
-      const x = label.left ? label.x + label.w : label.x;
-      const y = label.y + label.lineHeight * (index + 0.5);
-      const metrics = ctx.measureText(line);
-      const padding = label.size * 0.25;
-      const left = label.left ? x - metrics.width : x;
-      const ascent = metrics.actualBoundingBoxAscent;
-      const descent = metrics.actualBoundingBoxDescent;
-      ctx.fillStyle = ["#283178", "#101820"].includes(state.locationLabelColor) ? "#ffffff" : "#18204a";
-      ctx.fillRect(left - padding, y - ascent - padding, metrics.width + padding * 2, ascent + descent + padding * 2);
-      ctx.fillStyle = state.locationLabelColor;
-      ctx.fillText(line, x, y);
+  activeLocations().forEach((location, index) => {
+    const label = locationLabelLayout(location, index);
+    if (label.lines.length) drawResizableElement(index ? "location-label-2" : "location-label", () => {
+      ctx.textAlign = label.left ? "right" : "left";
+      ctx.textBaseline = "middle";
+      ctx.font = `900 ${label.size}px system-ui, sans-serif`;
+      label.lines.forEach((line, index) => {
+        const x = label.left ? label.x + label.w : label.x;
+        const y = label.y + label.lineHeight * (index + 0.5);
+        const metrics = ctx.measureText(line);
+        const padding = label.size * 0.25;
+        const left = label.left ? x - metrics.width : x;
+        const ascent = metrics.actualBoundingBoxAscent;
+        const descent = metrics.actualBoundingBoxDescent;
+        ctx.fillStyle = ["#283178", "#101820"].includes(state.locationLabelColor) ? "#ffffff" : "#18204a";
+        ctx.fillRect(left - padding, y - ascent - padding, metrics.width + padding * 2, ascent + descent + padding * 2);
+        ctx.fillStyle = state.locationLabelColor;
+        ctx.fillText(line, x, y);
+      });
     });
+  });
+  drawResizableElement("location-irf", () => {
+    drawIrfWord(90, 708, 140, theme.accent);
+  });
+  drawResizableElement("location-labels-group", () => {
+    drawAngledLabel("L'ENSEIGNEMENT", 90, 742, 214, 38, -11, theme.accent, "#101820");
+    drawAngledLabel("FRANCAIS", 122, 788, 160, 38, -4, "#b7d7ec", "#ffffff");
+    drawAngledLabel("A L'ETRANGER", 140, 828, 190, 38, -7, "#69b69a", "#101820");
   });
   drawResizableElement("location-title", () => {
     const layout = locationTitleLayout();
@@ -1431,12 +1515,16 @@ function rawTemplateElements() {
   }
   if (template.kind === "location") {
     const label = locationLabelLayout();
+    const secondLabel = state.multipleCities ? locationLabelLayout(state.secondLocation, 1) : null;
     const actions = formationActionLayout();
     return [
       marianneElement(26, 14),
       rectElement("location-globe", 622.5, 182.5, 675, 675, true),
       ...(label.lines.length ? [rectElement("location-label", label.x, label.y, label.w, label.h, true)] : []),
+      ...(secondLabel?.lines.length ? [rectElement("location-label-2", secondLabel.x, secondLabel.y, secondLabel.w, secondLabel.h, true)] : []),
       rectElement("location-title", 70, 132, 940, 170, true),
+      rectElement("location-irf", 90, 590, 286, 140, true),
+      rectElement("location-labels-group", 76, 724, 282, 150, true),
       rectElement("logo-cluster", 818, 972, 238, 82),
       ...(actions.lines.length ? [rectElement("formation-actions", actions.x, actions.y, actions.w, actions.h)] : []),
     ];
@@ -1723,12 +1811,19 @@ function drawLogoCluster(x, y, theme, elementId) {
 }
 
 function transparentDevise(image) {
+  if (!image) return null;
   const result = document.createElement("canvas");
   result.width = image.width;
   result.height = image.height;
   const context = result.getContext("2d");
   context.drawImage(image, 0, 0);
-  const pixels = context.getImageData(0, 0, result.width, result.height);
+  let pixels;
+  try {
+    pixels = context.getImageData(0, 0, result.width, result.height);
+  } catch (error) {
+    console.warn("Transparence du logo indisponible :", error);
+    return image;
+  }
   for (let index = 0; index < pixels.data.length; index += 4) {
     const brightness = Math.min(pixels.data[index], pixels.data[index + 1], pixels.data[index + 2]);
     pixels.data[index + 3] = Math.round(pixels.data[index + 3] * (1 - brightness / 255));
@@ -1759,6 +1854,7 @@ function drawMarianne(x, y, w, h, elementId) {
   drawLogo(state.logos.marianne, point.x, point.y, w, h);
   if (state.logos.devise) {
     const deviseX = marianneDeviseX(x) + (point.x - x);
+    ctx.globalCompositeOperation = "multiply";
     drawLogo(state.logos.devise, deviseX, point.y - 5, 97, 62);
   }
   ctx.restore();

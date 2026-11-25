@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Studio IRF</title>
-    <link rel="stylesheet" href="styles.css?v=20261022-151" />
+    <link rel="stylesheet" href="styles.css?v=20261125-149" />
   </head>
   <body>
     <main class="app-shell">
@@ -56,6 +56,11 @@
           <div class="section-heading"><h2>Localisation</h2></div>
           <label>Ville<select id="locationCity"></select></label>
           <label>Lieu de la formation<input id="locationLabel" type="text" maxlength="72" value="Bangkok, Thaïlande" /></label>
+          <label class="check-row"><input id="multipleCities" type="checkbox" />Villes multiples</label>
+          <div id="secondCityControls" class="second-city-controls" hidden>
+            <label>Deuxième ville<select id="secondLocationCity"></select></label>
+            <label>Deuxième lieu de formation<input id="secondLocationLabel" type="text" maxlength="72" value="Canberra, Australie" /></label>
+          </div>
           <label>Couleur du lieu
             <select id="locationLabelColor">
               <option value="#ffffff">Blanc</option>
@@ -219,6 +224,6 @@
 
     <script src="assets/d3.min.js"></script>
     <script src="assets/world-land.js"></script>
-    <script src="app.js?v=20261022-146"></script>
+    <script src="app.js?v=20261125-153"></script>
   </body>
 </html>
